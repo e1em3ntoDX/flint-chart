@@ -56,6 +56,7 @@ describe('MCP server', () => {
     expect(names).toEqual([
       'compile_chart',
       'create_chart_view',
+      'create_devexpress_chart',
       'list_chart_types',
       'list_themes',
       'render_chart',
@@ -152,6 +153,75 @@ describe('MCP server', () => {
     expect(payload[0].count).toBeGreaterThan(10);
     expect(payload[0].chartTypes[0]).toHaveProperty('chartType');
     expect(payload[0].chartTypes[0]).toHaveProperty('channels');
+  });
+
+  it('create_devexpress_chart compiles a Bar Chart to a flint.devexpress.chart/v1 plan', async () => {
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: { ...barChart },
+    });
+    expect(res.isError).toBeFalsy();
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.plan.schema).toBe('flint.devexpress.chart/v1');
+    expect(payload.plan.chartType).toBe('Bar Chart');
+    expect(payload.plan.target).toBe('devextreme');
+    expect(payload.plan.family).toBe('Cartesian');
+    expect(payload.projection.component).toBe('dxChart');
+    expect(payload.projection.options).toBeTruthy();
+  });
+
+  it('create_devexpress_chart surfaces a thrown assembler error (missing required channel) with its original message', async () => {
+    // "Candlestick Chart" passes schema validation (it's a valid enum member)
+    // but assembleDevExpressPlan's assertRequiredChannels throws because open/
+    // high/low/close are missing. That thrown Error must reach the client
+    // verbatim via errorResult(), not be swallowed or replaced.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          chartType: 'Candlestick Chart',
+          encodings: { x: { field: 'region' }, y: { field: 'revenue' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('Candlestick Chart requires channel');
+  });
+
+  it('create_devexpress_chart rejects an unsupported chartType at the schema level, not inside the compiler', async () => {
+    // "Violin Plot" is not in the devextreme chartType enum, so the MCP SDK's
+    // own argument validation rejects the call before the tool handler — and
+    // therefore assembleDevExpressPlan — ever runs. The SDK reports this as a
+    // normal tool result (isError: true) rather than a rejected call.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: { ...barChart.chart_spec, chartType: 'Violin Plot' },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/invalid arguments/i);
+    expect(res.content[0].text).toMatch(/invalid_enum_value/);
+  });
+
+  it('create_devexpress_chart rejects column/row facet encodings at the schema level', async () => {
+    // The encodings schema's own .refine() rejects column/row during argument
+    // validation, before the tool handler runs — i.e. before assertNoFacets()
+    // inside the compiler would.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          ...barChart.chart_spec,
+          encodings: { ...barChart.chart_spec.encodings, column: { field: 'region' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/faceting/i);
   });
 
   it('render_chart surfaces assembly errors as isError', async () => {

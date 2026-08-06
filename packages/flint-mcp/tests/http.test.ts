@@ -47,6 +47,7 @@ describe('MCP server over HTTP (stateless streamable transport)', () => {
     expect(names).toEqual([
       'compile_chart',
       'create_chart_view',
+      'create_devexpress_chart',
       'list_chart_types',
       'list_themes',
       'render_chart',
