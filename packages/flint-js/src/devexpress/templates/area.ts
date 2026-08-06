@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
-import { applyCartesianFrame, baseSeries, splitSeries } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries } from './bar';
 import { resolveArgumentScaleType, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -30,9 +30,11 @@ const areaChart: DxTemplateDef = {
         const hasColor = context.encodings.color != null;
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = areaViewType(context);
-        spec.series = hasColor
-            ? splitSeries(context, 'color', viewType)
-            : [baseSeries(context, viewType)];
+        if (hasColor) {
+            applySplitSeries(spec, context, 'color', viewType);
+        } else {
+            spec.series = [baseSeries(context, viewType)];
+        }
     },
 };
 

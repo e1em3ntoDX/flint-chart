@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
-import { applyCartesianFrame, baseSeries, splitSeries } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -37,9 +37,11 @@ const lineChart: DxTemplateDef = {
         const hasColor = context.encodings.color != null;
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = lineViewType(context);
-        spec.series = hasColor
-            ? splitSeries(context, 'color', viewType)
-            : [baseSeries(context, viewType)];
+        if (hasColor) {
+            applySplitSeries(spec, context, 'color', viewType);
+        } else {
+            spec.series = [baseSeries(context, viewType)];
+        }
     },
 };
 

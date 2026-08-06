@@ -61,6 +61,40 @@ describe('Line Chart template', () => {
         expect(plan.legend!.visible).toBe(true);
     });
 
+    // Regression: colour-split line charts shared one long-format dataSource, so
+    // both SKUs' lines traced every row of the table instead of their own.
+    it('gives each colour series its own value column over a pivoted table', () => {
+        const def = dxGetTemplateDef('Line Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, color: { field: 'sku' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                color: { field: 'sku', type: 'nominal' } as never,
+            },
+            table: [
+                { month: '2026-01', sales: 10, sku: 'A' },
+                { month: '2026-01', sales: 20, sku: 'B' },
+                { month: '2026-02', sales: 14, sku: 'A' },
+                { month: '2026-02', sales: 31, sku: 'B' },
+                { month: '2026-03', sales: 18, sku: 'A' },
+            ],
+        }));
+
+        expect(plan.series!.map((s) => [s.name, s.valueFields])).toEqual([
+            ['A', ['A']], ['B', ['B']],
+        ]);
+        expect(plan.series!.every((s) => s.argumentField === 'month')).toBe(true);
+        expect(plan.data!.points).toEqual([
+            { month: '2026-01', A: 10, B: 20 },
+            { month: '2026-02', A: 14, B: 31 },
+            // B stops after February: an explicit null so the line breaks
+            // rather than dropping to a fabricated zero.
+            { month: '2026-03', A: 18, B: null },
+        ]);
+    });
+
     it('never rotates — Flint omits transpose for line charts', () => {
         const def = dxGetTemplateDef('Line Chart', 'devextreme')!;
         const plan = draft();
@@ -89,6 +123,35 @@ describe('Area Chart template', () => {
             }));
             expect(plan.series![0].viewType).toBe(expected);
         }
+    });
+
+    it('splits stacked areas into one pivoted column per colour value', () => {
+        const def = dxGetTemplateDef('Area Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Area Chart',
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, color: { field: 'sku' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative', stackable: 'sum' } as never,
+                color: { field: 'sku', type: 'nominal' } as never,
+            },
+            table: [
+                { month: '2026-01', sales: 10, sku: 'A' },
+                { month: '2026-01', sales: 20, sku: 'B' },
+                { month: '2026-02', sales: 14, sku: 'A' },
+                { month: '2026-02', sales: 31, sku: 'B' },
+            ],
+        }));
+
+        expect(plan.series!.map((s) => [s.name, s.viewType, s.valueFields])).toEqual([
+            ['A', 'StackedArea', ['A']],
+            ['B', 'StackedArea', ['B']],
+        ]);
+        expect(plan.data!.points).toEqual([
+            { month: '2026-01', A: 10, B: 20 },
+            { month: '2026-02', A: 14, B: 31 },
+        ]);
     });
 });
 
