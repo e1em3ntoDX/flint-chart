@@ -105,3 +105,82 @@ describe('assembleDevExpressPlan', () => {
         expect(Array.isArray(plan.warnings)).toBe(true);
     });
 });
+
+describe('assembleDevExpressPlan aggregation', () => {
+    // Regression coverage for wiring core's applyAggregation into runCoreStages:
+    // a live demo prompt against a 32-row/4-region fixture produced a 32-slice
+    // pie instead of 4, because nothing in the DevExpress pipeline collapsed
+    // multiple rows per category before handing them to the Pie Chart template.
+    // 2 regions x 3 quarters = 6 raw rows, multiple rows per region.
+    const multiRowPerCategory: ChartAssemblyInput = {
+        data: {
+            values: [
+                { region: 'North', quarter: 'Q1', revenue: 100 },
+                { region: 'North', quarter: 'Q2', revenue: 200 },
+                { region: 'North', quarter: 'Q3', revenue: 300 },
+                { region: 'South', quarter: 'Q1', revenue: 50 },
+                { region: 'South', quarter: 'Q2', revenue: 150 },
+                { region: 'South', quarter: 'Q3', revenue: 250 },
+            ],
+        },
+        semantic_types: { region: 'Country', quarter: 'Quarter', revenue: 'Price' },
+        chart_spec: {
+            chartType: 'Pie Chart',
+            encodings: {
+                color: { field: 'region' },
+                size: { field: 'revenue', aggregate: 'sum' },
+            },
+        },
+    };
+
+    it('collapses multiple rows per category into one point per category when `aggregate: \'sum\'` is set', () => {
+        const plan = assembleDevExpressPlan(multiRowPerCategory);
+        expect(plan.family).toBe('Circular');
+        expect(plan.series![0].viewType).toBe('Pie');
+        expect(plan.data!.points.length).toBe(2);
+
+        const byRegion = Object.fromEntries(
+            (plan.data!.points as Array<Record<string, unknown>>).map((p) => [p.region as string, p.revenue]),
+        );
+        expect(byRegion.North).toBe(600); // 100 + 200 + 300
+        expect(byRegion.South).toBe(450); // 50 + 150 + 250
+
+        expect(plan.series![0].argumentField).toBe('region');
+        // resolveChannelSemantics rewrites an aggregated channel's field to the
+        // derived column applyAggregation produces (core/resolve-semantics.ts:403-408).
+        expect(plan.series![0].valueFields).toEqual(['revenue_sum']);
+
+        // applyAggregation also keeps the plain `revenue` column populated with
+        // the same aggregated value (core/aggregate.ts:109-111), so both the
+        // derived column the series references and the original field name
+        // agree on the per-region sum.
+        const byRegionDerived = Object.fromEntries(
+            (plan.data!.points as Array<Record<string, unknown>>).map((p) => [p.region as string, p.revenue_sum]),
+        );
+        expect(byRegionDerived.North).toBe(600);
+        expect(byRegionDerived.South).toBe(450);
+    });
+
+    it('leaves an already one-row-per-category Pie Chart unaffected when `aggregate` is not set (no-op)', () => {
+        const preAggregated: ChartAssemblyInput = {
+            data: {
+                values: [
+                    { region: 'North', revenue: 600 },
+                    { region: 'South', revenue: 450 },
+                ],
+            },
+            semantic_types: { region: 'Country', revenue: 'Price' },
+            chart_spec: {
+                chartType: 'Pie Chart',
+                encodings: { color: { field: 'region' }, size: { field: 'revenue' } },
+            },
+        };
+        const plan = assembleDevExpressPlan(preAggregated);
+        expect(plan.data!.points.length).toBe(2);
+        const byRegion = Object.fromEntries(
+            (plan.data!.points as Array<Record<string, unknown>>).map((p) => [p.region as string, p.revenue]),
+        );
+        expect(byRegion.North).toBe(600);
+        expect(byRegion.South).toBe(450);
+    });
+});

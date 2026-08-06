@@ -6,6 +6,7 @@ import type {
     AssembleOptions, ChannelSemantics, ChartAssemblyInput, ChartEncoding, ChartWarning,
     InstantiateContext, LayoutDeclaration, LayoutResult, MarkCognitiveChannel,
 } from '../core/types';
+import { applyAggregation } from '../core/aggregate';
 import { applyEncodingOverrides } from '../core/encoding-overrides';
 import { decideColorMaps, type ColorDecisionResult } from '../core/color-decisions';
 import { computeChannelBudgets, computeLayout } from '../core/compute-layout';
@@ -99,10 +100,20 @@ function runCoreStages(
     // objects — which is what resolveChannelSemantics requires.
     const rawData = input.data.values ?? [];
     const normalized = normalizeStaticSeries(input.chart_spec.encodings, rawData, semanticTypes);
-    const data: any[] = normalized.data;
+    let data: any[] = normalized.data;
     // applyEncodingOverrides (core/encoding-overrides.ts:28) is a no-op unless
     // the template declares encodingActions and the host stored a choice.
     const encodings = applyEncodingOverrides(def, normalized.encodings, chartProperties);
+
+    // Optional aggregation transform: when an encoding sets `aggregate`, collapse
+    // the rows here (grouping by the dimension channels) so the derived
+    // `${field}_${op}` / `_count` columns the assemblers reference actually
+    // exist. No-op when no encoding requests it or the data is pre-aggregated.
+    // Same relative position as vegalite/assemble.ts (right after encoding
+    // overrides/normalization, before convertTemporalData + resolveChannelSemantics);
+    // DevExpress templates have no `normalizeEncodings` step, so this runs
+    // directly after applyEncodingOverrides.
+    data = applyAggregation(encodings, data);
 
     // ── PHASE 0: semantics ───────────────────────────────────────────────
     // convertTemporalData (core/resolve-semantics.ts:242) MUST run first: its
