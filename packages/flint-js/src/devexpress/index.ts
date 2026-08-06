@@ -3,8 +3,7 @@
 // Licensed under the MIT License.
 
 export { assembleDevExpressPlan, type AssembleDevExpressOptions } from './assemble';
-// Uncommented in Task 11, once ./devextreme exists.
-// export { planToDevExtreme } from './devextreme';
+export { planToDevExtreme } from './devextreme';
 export {
     prepareDevExpressPlan, SUPPORTED_VIEW_TYPES, SHARED_VIEW_TYPES,
     XTRACHARTS_ONLY_VIEW_TYPES, VIEW_TYPES_BY_TARGET,
