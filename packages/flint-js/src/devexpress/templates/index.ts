@@ -27,6 +27,7 @@ export interface DxTemplateDef extends ChartTemplateDef {
  * creation, before any module's top-level code executes, which sidesteps the
  * TDZ hazard entirely; the `??=` lazily creates the array on first use.
  */
+// eslint-disable-next-line no-var -- `var` is load-bearing here, not a style slip: see the TDZ rationale above.
 var registry: DxTemplateDef[] | undefined;
 
 export function registerTemplate(def: DxTemplateDef): void {
