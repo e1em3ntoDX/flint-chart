@@ -11,10 +11,26 @@ export interface DxTemplateDef extends ChartTemplateDef {
     targets: RenderTarget[];
 }
 
-/** Populated by Tasks 7-10 via registerTemplate(). */
-const registry: DxTemplateDef[] = [];
+/**
+ * Populated by Tasks 7-10 via registerTemplate(), called from each template
+ * module's own top-level code as a side effect of the `import './bar'` (etc.)
+ * lines at the bottom of this file.
+ *
+ * Declared with `var` and lazily initialized rather than `const registry = []`:
+ * template modules import `registerTemplate` back from this module, so the
+ * dependency graph is circular (index -> bar -> index). Per ES module
+ * evaluation order, all of a module's static imports are evaluated *before*
+ * its own top-level code runs — so by the time bar.ts's top-level
+ * `registerTemplate(barChart)` call executes, this file's own `const registry
+ * = []` line has not run yet, and `registry` would still be in its temporal
+ * dead zone. `var` bindings are initialized to `undefined` at environment
+ * creation, before any module's top-level code executes, which sidesteps the
+ * TDZ hazard entirely; the `??=` lazily creates the array on first use.
+ */
+var registry: DxTemplateDef[] | undefined;
 
 export function registerTemplate(def: DxTemplateDef): void {
+    registry ??= [];
     if (registry.some((d) => d.chart === def.chart)) {
         throw new Error(`Template already registered: ${def.chart}`);
     }
@@ -22,7 +38,7 @@ export function registerTemplate(def: DxTemplateDef): void {
 }
 
 export function dxGetTemplateDef(chartType: string, target: RenderTarget): DxTemplateDef | undefined {
-    return registry.find((d) => d.chart === chartType && d.targets.includes(target));
+    return registry?.find((d) => d.chart === chartType && d.targets.includes(target));
 }
 
 export function dxGetTemplateChannels(chartType: string, target: RenderTarget): string[] {
@@ -30,7 +46,7 @@ export function dxGetTemplateChannels(chartType: string, target: RenderTarget): 
 }
 
 export function dxSupportedChartTypes(target: RenderTarget): string[] {
-    return registry.filter((d) => d.targets.includes(target)).map((d) => d.chart);
+    return (registry ?? []).filter((d) => d.targets.includes(target)).map((d) => d.chart);
 }
 
 const FACET_CHANNELS = ['column', 'row'] as const;
@@ -61,7 +77,7 @@ export function assertRequiredChannels(
 }
 
 // Registration side effects. Order determines dxSupportedChartTypes() order.
-// import './bar';
+import './bar';
 // import './line';
 // import './area';
 // import './point';

@@ -37,7 +37,14 @@
 import type { ChannelSemantics } from '../core/types';
 import type { ArgumentScaleType, PalettePlan, ValueScaleType } from './plan';
 
-type Loose = Partial<ChannelSemantics> & Record<string, unknown>;
+// Note: intentionally *not* intersected with `Record<string, unknown>`. An
+// interface without an index signature (ChannelSemantics has none) is not
+// assignable to a type requiring one, so real callers passing an actual
+// `ChannelSemantics` value (e.g. `context.channelSemantics.x` from
+// InstantiateContext) would fail to type-check against these readers. Tests
+// that build ad hoc fixtures already cast with `as never`, so they don't need
+// the extra looseness.
+type Loose = Partial<ChannelSemantics>;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
     return value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined;
