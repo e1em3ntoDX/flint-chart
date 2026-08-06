@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { assembleDevExpressPlan, planToDevExtreme } from 'flint-chart';
 
 import { renderChart, resolveDataSource } from './render/index.js';
+import { prepareInput } from './render/assemble.js';
 import type { RenderBackend } from './render/types.js';
 import { compileChart } from './tools/compile.js';
 import { validateChart } from './tools/validate.js';
@@ -326,7 +327,19 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     },
     async (args: any) => {
       try {
-        const input = toAssemblyInput(args as AssemblyInputArgs);
+        // Route through the same prepareInput pipeline every sibling tool
+        // uses (compile_chart, validate_chart, render_chart): resolves
+        // data.url to inline rows, and enforces the shared guards (row-count
+        // DoS cap, canvas-dimension cap, unknown-field/unknown-channel
+        // rejection) before assembleDevExpressPlan ever sees the input.
+        // Passing 'devextreme' lets validateChartSpec check encodings against
+        // the DevExpress template's own channel allowlist, exactly as passing
+        // a RenderBackend does for the vegalite/echarts/chartjs tools.
+        const input = prepareInput(
+          toAssemblyInput(args as AssemblyInputArgs),
+          dataSourceOptions,
+          'devextreme',
+        );
         const plan = assembleDevExpressPlan(input, { target: 'devextreme' });
         const projection = planToDevExtreme(plan);
         return jsonResult({ plan, projection });
