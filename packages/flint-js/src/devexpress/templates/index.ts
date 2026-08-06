@@ -78,8 +78,8 @@ export function assertRequiredChannels(
 
 // Registration side effects. Order determines dxSupportedChartTypes() order.
 import './bar';
-// import './line';
-// import './area';
+import './line';
+import './area';
 // import './point';
 // import './financial';
 // import './circular';
