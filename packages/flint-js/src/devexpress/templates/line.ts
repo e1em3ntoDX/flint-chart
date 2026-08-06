@@ -19,7 +19,14 @@ function lineViewType(context: InstantiateContext): string {
 
 const lineChart: DxTemplateDef = {
     chart: 'Line Chart',
-    template: {},
+    // `template.mark: 'line'` is read by markTypeOf (devexpress/assemble.ts:60)
+    // before it falls back to the markCognitiveChannel ('position') mapping.
+    // Without it, computeZeroDecision would treat a Line Chart as a scatter/point
+    // mark, wrongly defaulting includeZero to false on zero-meaningful data
+    // (e.g. a revenue line chart) — diverging from Flint's own core line branch
+    // and its vegalite Line Chart template (vegalite/templates/line.ts:91), both
+    // of which get includeZero: true for the same case.
+    template: { mark: 'line' },
     channels: ['x', 'y', 'color', 'strokeDash', 'detail', 'opacity'],
     requiredChannels: ['x', 'y'],
     family: 'Cartesian',

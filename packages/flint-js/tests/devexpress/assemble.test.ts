@@ -36,6 +36,34 @@ describe('assembleDevExpressPlan', () => {
         expect(typeof plan.diagram!.axisY.includeZero).toBe('boolean');
     });
 
+    it('diverges the zero baseline between a length mark and a point mark on the same zero-meaningful data', () => {
+        // Regression gate for the zero-merge mechanism in runCoreStages: a Bar
+        // Chart is a length mark (structural baseline, includeZero: true) and a
+        // Scatter Plot is a point mark (data-fit baseline, includeZero: false)
+        // for the same revenue/Price data. If the zero merge were ever deleted
+        // or short-circuited, both would collapse to the same boolean and this
+        // would fail.
+        const barPlan = assembleDevExpressPlan(input({ chartType: 'Bar Chart' }));
+        const scatterPlan = assembleDevExpressPlan(input({
+            chartType: 'Scatter Plot',
+            encodings: { x: { field: 'revenue' }, y: { field: 'revenue' } },
+        }));
+        expect(barPlan.diagram!.axisY.includeZero).toBe(true);
+        expect(scatterPlan.diagram!.axisY.includeZero).toBe(false);
+    });
+
+    it('gives a Line Chart the same zero baseline as Flint\'s own line branch (line mark, not point/scatter)', () => {
+        // Regression gate for the Line Chart template declaring
+        // `template: { mark: 'line' }`: without it, markTypeOf falls back to
+        // the markCognitiveChannel ('position') mapping and computeZeroDecision
+        // takes the scatter/point branch, wrongly producing includeZero: false
+        // on zero-meaningful data (e.g. revenue/Price) — diverging from Flint's
+        // own core line branch and vegalite Line Chart template, both of which
+        // get includeZero: true for the same chart on the same data.
+        const linePlan = assembleDevExpressPlan(input({ chartType: 'Line Chart' }));
+        expect(linePlan.diagram!.axisY.includeZero).toBe(true);
+    });
+
     it('rejects a faceted spec', () => {
         expect(() => assembleDevExpressPlan(input({
             encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, column: { field: 'region' } },
