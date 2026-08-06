@@ -80,6 +80,6 @@ export function assertRequiredChannels(
 import './bar';
 import './line';
 import './area';
-// import './point';
-// import './financial';
-// import './circular';
+import './point';
+import './financial';
+import './circular';
