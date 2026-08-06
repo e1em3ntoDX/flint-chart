@@ -25,7 +25,9 @@
     "url": "https://github.com/microsoft/flint-chart/issues"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/devexpress/templates/*.ts"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
