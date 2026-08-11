@@ -15,6 +15,7 @@ import { convertTemporalData, resolveChannelSemantics } from '../core/resolve-se
 import { computeZeroDecision } from '../core/semantic-types';
 import { normalizeStaticSeries } from '../core/static-series';
 import { prepareDevExpressPlan } from './artifact';
+import { pickDevExpressPalette } from './colormap';
 import {
     DEVEXPRESS_PLAN_SCHEMA, type DevExpressChartPlan, type RenderTarget,
 } from './plan';
@@ -24,17 +25,6 @@ import { assertNoFacets, assertRequiredChannels, dxGetTemplateDef, type DxTempla
 export interface AssembleDevExpressOptions {
     target?: RenderTarget;
 }
-
-/**
- * Fallback categorical ramp, used when Flint's colour decisions carry no
- * concrete colours (the current `ColorDecision` shape only names a scheme
- * *class* and an optional scheme id — picking the actual swatches is left to
- * each backend). Eight entries: DevExpress palettes cycle after that anyway.
- */
-const DEFAULT_CATEGORICAL_COLORS = [
-    '#5f8b95', '#ba4d51', '#af8a53', '#955f71', '#859666',
-    '#7e688c', '#4f6b8f', '#a6656a',
-];
 
 /** Default canvas Flint lays out against when the caller states no base size. */
 const DEFAULT_CANVAS = { width: 400, height: 320 };
@@ -221,19 +211,13 @@ function runCoreStages(
 }
 
 /**
- * Concrete swatches for the plan's palette. Core's ColorDecision names a
- * scheme class (and sometimes an id) but not colours, so this is a defensive
- * read: honour explicit colours if a core version ever supplies them,
- * otherwise fall back to the module ramp.
+ * Concrete swatches for the plan's palette. Delegates the actual pick to
+ * `colormap.ts`, which knows how to turn core's abstract scheme
+ * type/id/categoryCount into real DevExpress-appropriate hex values.
  */
 function resolvePaletteColors(decisions: ColorDecisionResult | undefined): string[] {
-    for (const decision of [decisions?.color, decisions?.group, decisions?.fill, decisions?.stroke]) {
-        const colors = (decision as { colors?: unknown } | undefined)?.colors;
-        if (Array.isArray(colors) && colors.length > 0 && colors.every((c) => typeof c === 'string')) {
-            return colors as string[];
-        }
-    }
-    return [...DEFAULT_CATEGORICAL_COLORS];
+    const decision = decisions?.color ?? decisions?.group ?? decisions?.fill ?? decisions?.stroke;
+    return pickDevExpressPalette(decision);
 }
 
 export function assembleDevExpressPlan(

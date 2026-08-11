@@ -184,3 +184,28 @@ describe('assembleDevExpressPlan aggregation', () => {
         expect(byRegion.South).toBe(450);
     });
 });
+
+describe('assembleDevExpressPlan palette', () => {
+    it('picks a non-default palette for a high-cardinality categorical split', () => {
+        // 12 distinct groups — more than the 8-entry default ramp's capacity,
+        // so a correctly-wired colormap must pick the larger 20-entry map.
+        const values = Array.from({ length: 12 }, (_, i) => ({
+            category: `cat-${i}`,
+            month: 'Jan',
+            metric: 10 + i,
+        }));
+        const plan = assembleDevExpressPlan({
+            data: { values },
+            semantic_types: { category: 'Category', month: 'Category', metric: 'Quantity' },
+            chart_spec: {
+                chartType: 'Pie Chart',
+                encodings: { color: { field: 'category' }, size: { field: 'metric', aggregate: 'sum' } },
+            },
+        } as never);
+        expect(plan.palette.colors).not.toEqual([
+            '#5f8b95', '#ba4d51', '#af8a53', '#955f71',
+            '#859666', '#7e688c', '#4f6b8f', '#a6656a',
+        ]);
+        expect(plan.palette.colors.length).toBeGreaterThanOrEqual(12);
+    });
+});
