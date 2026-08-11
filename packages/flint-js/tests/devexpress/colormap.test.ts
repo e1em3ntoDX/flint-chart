@@ -47,4 +47,9 @@ describe('pickDevExpressPalette', () => {
         const colors = pickDevExpressPalette(decision({ schemeType: 'categorical', schemeId: 'nonexistent-scheme' }));
         expect(colors).toEqual(DEVEXPRESS_DEFAULT_CATEGORICAL_COLORS);
     });
+
+    it('falls back to the largest available ramp, not the smallest, when the category count exceeds every map', () => {
+        const colors = pickDevExpressPalette(decision({ schemeType: 'categorical', categoryCount: 50 }));
+        expect(colors).toHaveLength(20);
+    });
 });

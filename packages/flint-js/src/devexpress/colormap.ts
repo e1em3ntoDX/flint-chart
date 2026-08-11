@@ -104,7 +104,9 @@ export function pickDevExpressPalette(decision: ColorDecision | undefined): stri
         const byCapacity = mapsOfType
             .filter((m) => m.maxCategories == null || m.maxCategories >= k)
             .sort((a, b) => (a.maxCategories ?? Infinity) - (b.maxCategories ?? Infinity));
-        const picked = byCapacity[0] ?? mapsOfType[0];
+        const byDescendingCapacity = [...mapsOfType]
+            .sort((a, b) => (b.maxCategories ?? Infinity) - (a.maxCategories ?? Infinity));
+        const picked = byCapacity[0] ?? byDescendingCapacity[0];
         if (picked && picked.colors.length > 0) {
             return [...picked.colors];
         }
