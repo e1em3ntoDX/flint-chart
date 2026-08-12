@@ -46,6 +46,8 @@ export interface SeriesPlan {
     labelsVisible: boolean;
     /** Marker kind name for point-family views, e.g. "Circle". */
     markerKind?: string;
+    /** Format hint for this series' point labels and tooltip text. */
+    valueFormat?: ValueFormatSpec;
 }
 
 export interface AxisPlan {
@@ -70,6 +72,19 @@ export interface PalettePlan {
     class: 'categorical' | 'sequential' | 'diverging';
     /** Ordered hex colours. */
     colors: string[];
+}
+
+/**
+ * Format hint for a series' point labels and tooltip text, sourced from
+ * Flint core's ChannelSemantics.tooltipFormat. `pattern` follows the small
+ * subset of d3-format syntax core actually emits — see number-format.ts for
+ * exactly what's interpreted.
+ */
+export interface ValueFormatSpec {
+    pattern?: string;
+    prefix?: string;
+    suffix?: string;
+    abbreviate?: boolean;
 }
 
 export interface TitlePlan {

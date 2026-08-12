@@ -197,6 +197,15 @@ export function prepareDevExpressPlan(value: unknown): DevExpressChartPlan {
         requireBoolean(series.labelsVisible, `series ${series.name} labelsVisible`);
         requireOptionalString(series.color, `series ${series.name} color`);
         requireOptionalString(series.markerKind, `series ${series.name} markerKind`);
+        if (series.valueFormat !== undefined) {
+            const vf = requireObject(series.valueFormat, `series ${series.name} valueFormat`);
+            requireOptionalString(vf.pattern, `series ${series.name} valueFormat.pattern`);
+            requireOptionalString(vf.prefix, `series ${series.name} valueFormat.prefix`);
+            requireOptionalString(vf.suffix, `series ${series.name} valueFormat.suffix`);
+            if (vf.abbreviate !== undefined) {
+                requireBoolean(vf.abbreviate, `series ${series.name} valueFormat.abbreviate`);
+            }
+        }
     }
 
     if (plan.family === 'Cartesian') {

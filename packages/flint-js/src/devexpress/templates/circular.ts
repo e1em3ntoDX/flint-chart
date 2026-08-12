@@ -5,6 +5,7 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
 import { fieldOf, humanizeFieldName } from './bar';
+import { resolveTooltipFormat } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -30,6 +31,7 @@ function applyCircularFrame(spec: Draft, context: InstantiateContext, viewType: 
         argumentScaleType: 'Qualitative',
         valueScaleType: 'Numerical',
         labelsVisible: false,
+        valueFormat: resolveTooltipFormat(context.channelSemantics.size),
     }];
     spec.titles ??= [];
     spec.warnings ??= [];

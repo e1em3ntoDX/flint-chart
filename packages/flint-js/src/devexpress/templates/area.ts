@@ -5,7 +5,7 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import { applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName } from './bar';
-import { resolveArgumentScaleType, resolveValueScaleType } from '../semantics-bridge';
+import { resolveArgumentScaleType, resolveTooltipFormat, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -59,6 +59,7 @@ const rangeAreaChart: DxTemplateDef = {
             argumentScaleType: resolveArgumentScaleType(context.channelSemantics.x),
             valueScaleType: resolveValueScaleType(context.channelSemantics.y),
             labelsVisible: false,
+            valueFormat: resolveTooltipFormat(context.channelSemantics.y),
         };
         spec.series = [series];
     },

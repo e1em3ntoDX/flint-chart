@@ -100,6 +100,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
                 },
             ],
         })],
+        ['a plan with a series valueFormat', () => {
+            const p = validPlan();
+            (p.series[0] as Record<string, unknown>).valueFormat = { pattern: ',.2f', prefix: '$' };
+            return p;
+        }],
     ];
 
     const rejected: Array<[string, () => unknown]> = [
@@ -136,6 +141,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
         ['a non-object data point', () => ({ ...validPlan(), data: { points: [[1, 2]] } })],
         ['a non-string value field', () => {
             const p = validPlan(); p.series[0].valueFields = [7 as never]; return p;
+        }],
+        ['a valueFormat with a non-string pattern', () => {
+            const p = validPlan();
+            (p.series[0] as Record<string, unknown>).valueFormat = { pattern: 42 };
+            return p;
         }],
     ];
 

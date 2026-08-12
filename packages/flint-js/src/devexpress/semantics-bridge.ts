@@ -35,7 +35,7 @@
  */
 
 import type { ChannelSemantics } from '../core/types';
-import type { ArgumentScaleType, PalettePlan, ValueScaleType } from './plan';
+import type { ArgumentScaleType, PalettePlan, ValueFormatSpec, ValueScaleType } from './plan';
 
 // Note: intentionally *not* intersected with `Record<string, unknown>`. An
 // interface without an index signature (ChannelSemantics has none) is not
@@ -77,6 +77,18 @@ export function resolveLabelFormat(sem: Loose | undefined): string | undefined {
         }
     }
     return undefined;
+}
+
+export function resolveTooltipFormat(sem: Loose | undefined): ValueFormatSpec | undefined {
+    const format = (sem?.tooltipFormat ?? sem?.format) as unknown;
+    const record = asRecord(format);
+    if (!record) return undefined;
+    const result: ValueFormatSpec = {};
+    if (typeof record.pattern === 'string') result.pattern = record.pattern;
+    if (typeof record.prefix === 'string') result.prefix = record.prefix;
+    if (typeof record.suffix === 'string') result.suffix = record.suffix;
+    if (typeof record.abbreviate === 'boolean') result.abbreviate = record.abbreviate;
+    return Object.keys(result).length > 0 ? result : undefined;
 }
 
 export function resolveLogarithmic(sem: Loose | undefined): boolean {

@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
-import { resolveArgumentScaleType } from '../semantics-bridge';
+import { resolveArgumentScaleType, resolveTooltipFormat } from '../semantics-bridge';
 import { applyCartesianFrame, fieldOf } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -35,6 +35,7 @@ const candlestickChart: DxTemplateDef = {
             argumentScaleType: resolveArgumentScaleType(context.channelSemantics.x),
             valueScaleType: 'Numerical',
             labelsVisible: false,
+            valueFormat: resolveTooltipFormat(context.channelSemantics.high),
         }];
     },
 };

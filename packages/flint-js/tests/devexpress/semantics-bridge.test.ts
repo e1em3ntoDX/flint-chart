@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-    resolveIncludeZero, resolveLabelFormat, resolveLogarithmic,
+    resolveIncludeZero, resolveLabelFormat, resolveLogarithmic, resolveTooltipFormat,
     resolveArgumentScaleType, resolveValueScaleType, resolvePaletteClass,
 } from '../../src/devexpress/semantics-bridge';
 
@@ -74,6 +74,33 @@ describe('resolveLabelFormat', () => {
     it('reads the real FormatSpec shape, with prefix/suffix/abbreviate also present', () => {
         const format = { pattern: ',.2f', prefix: '$', suffix: 'k', abbreviate: true };
         expect(resolveLabelFormat({ format } as never)).toBe(',.2f');
+    });
+});
+
+describe('resolveTooltipFormat', () => {
+    it('is undefined when no tooltipFormat or format is present', () => {
+        expect(resolveTooltipFormat(undefined)).toBeUndefined();
+        expect(resolveTooltipFormat({} as never)).toBeUndefined();
+    });
+
+    it('reads a real tooltipFormat with a prefix', () => {
+        const tooltipFormat = { pattern: ',.2f', prefix: '$' };
+        expect(resolveTooltipFormat({ tooltipFormat } as never)).toEqual({ pattern: ',.2f', prefix: '$' });
+    });
+
+    it('reads a real tooltipFormat with a suffix', () => {
+        const tooltipFormat = { pattern: ',d', suffix: '%' };
+        expect(resolveTooltipFormat({ tooltipFormat } as never)).toEqual({ pattern: ',d', suffix: '%' });
+    });
+
+    it('falls back to .format when .tooltipFormat is absent', () => {
+        const format = { pattern: '.1%' };
+        expect(resolveTooltipFormat({ format } as never)).toEqual({ pattern: '.1%' });
+    });
+
+    it('prefers .tooltipFormat over .format when both are present', () => {
+        const sem = { format: { pattern: 'x' }, tooltipFormat: { pattern: ',.2f' } };
+        expect(resolveTooltipFormat(sem as never)).toEqual({ pattern: ',.2f' });
     });
 });
 

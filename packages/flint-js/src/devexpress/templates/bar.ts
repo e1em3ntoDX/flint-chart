@@ -6,7 +6,7 @@ import type { ChartWarning, InstantiateContext } from '../../core/types';
 import type { AxisPlan, DevExpressChartPlan, SeriesPlan } from '../plan';
 import {
     resolveArgumentScaleType, resolveIncludeZero, resolveLabelFormat,
-    resolveLogarithmic, resolveReverse, resolveValueScaleType,
+    resolveLogarithmic, resolveReverse, resolveTooltipFormat, resolveValueScaleType,
 } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -102,6 +102,7 @@ export function baseSeries(context: InstantiateContext, viewType: string): Serie
         argumentScaleType: resolveArgumentScaleType(context.channelSemantics.x),
         valueScaleType: resolveValueScaleType(context.channelSemantics.y),
         labelsVisible: false,
+        valueFormat: resolveTooltipFormat(context.channelSemantics.y),
     };
 }
 
