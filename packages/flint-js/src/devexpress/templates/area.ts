@@ -31,7 +31,7 @@ const areaChart: DxTemplateDef = {
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = areaViewType(context);
         if (hasColor) {
-            applySplitSeries(spec, context, 'color', viewType);
+            applySplitSeries(spec, context, 'color', viewType, false);
         } else {
             spec.series = [baseSeries(context, viewType)];
         }

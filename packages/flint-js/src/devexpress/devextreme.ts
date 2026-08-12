@@ -11,6 +11,7 @@
  */
 
 import type { AxisPlan, DevExpressChartPlan, SeriesPlan } from './plan';
+import { formatValue } from './number-format';
 
 const VIEW_TYPE_TO_DX: Record<string, string> = {
     Bar: 'bar',
@@ -50,7 +51,10 @@ function cartesianSeries(series: SeriesPlan): Record<string, unknown> {
         name: series.name,
         type,
         argumentField: series.argumentField,
-        label: { visible: series.labelsVisible },
+        label: {
+            visible: series.labelsVisible,
+            customizeText: (info: { value?: unknown }) => formatValue(info.value, series.valueFormat),
+        },
     };
     if (series.color) base.color = series.color;
 
@@ -70,6 +74,19 @@ function cartesianSeries(series: SeriesPlan): Record<string, unknown> {
         base.valueField = series.valueFields[0];
     }
     return base;
+}
+
+/**
+ * A single tooltip callback shared by the whole dxChart, looked up per hover
+ * by series name — a per-series closure won't do, since DevExtreme's
+ * tooltip.customizeTooltip is configured once at the chart level.
+ */
+function buildCartesianTooltipCustomizer(series: SeriesPlan[]) {
+    const formatBySeries = new Map(series.map((s) => [s.name, s.valueFormat]));
+    return (info: { seriesName?: unknown; value?: unknown }) => {
+        const name = String(info.seriesName ?? '');
+        return { text: `${name}: ${formatValue(info.value, formatBySeries.get(name))}` };
+    };
 }
 
 function axisOptions(axis: AxisPlan, isValueAxis: boolean): Record<string, unknown> {
@@ -94,11 +111,22 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
                 palette: plan.palette.colors,
                 legend: { visible: plan.legend.visible, position: 'outside' },
                 title: plan.titles.find((t) => t.role === 'chart')?.text,
+                tooltip: {
+                    enabled: true,
+                    customizeTooltip: (info: { argument?: unknown; value?: unknown }) => (
+                        { text: `${info.argument}: ${formatValue(info.value, series.valueFormat)}` }
+                    ),
+                },
                 series: [{
                     type: dxSeriesType(series.viewType),
                     argumentField: series.argumentField,
                     valueField: series.valueFields[0],
-                    label: { visible: series.labelsVisible },
+                    label: {
+                        visible: series.labelsVisible,
+                        customizeText: (info: { argument?: unknown; value?: unknown }) => (
+                            `${info.argument}: ${formatValue(info.value, series.valueFormat)}`
+                        ),
+                    },
                 }],
             },
         };
@@ -115,7 +143,10 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
             valueAxis: axisOptions(diagram.axisY, true),
             legend: { visible: plan.legend.visible, position: 'outside' },
             title: plan.titles.find((t) => t.role === 'chart')?.text,
-            tooltip: { enabled: true },
+            tooltip: {
+                enabled: true,
+                customizeTooltip: buildCartesianTooltipCustomizer(plan.series),
+            },
             series: plan.series.map(cartesianSeries),
         },
     };

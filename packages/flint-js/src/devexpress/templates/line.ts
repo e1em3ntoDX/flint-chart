@@ -38,9 +38,9 @@ const lineChart: DxTemplateDef = {
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = lineViewType(context);
         if (hasColor) {
-            applySplitSeries(spec, context, 'color', viewType);
+            applySplitSeries(spec, context, 'color', viewType, true);
         } else {
-            spec.series = [baseSeries(context, viewType)];
+            spec.series = [{ ...baseSeries(context, viewType), labelsVisible: true }];
         }
     },
 };

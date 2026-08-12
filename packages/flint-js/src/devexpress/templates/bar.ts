@@ -153,12 +153,13 @@ export function splitSeries(
     context: InstantiateContext,
     channel: string,
     viewType: string,
+    labelsVisible: boolean,
 ): { series: SeriesPlan[]; points?: Record<string, unknown>[]; warnings: ChartWarning[] } {
     const values = splitValues(context, channel);
     const splitField = fieldOf(context, channel);
     const base = baseSeries(context, viewType);
     if (!splitField || values.length === 0) {
-        return { series: [base], warnings: [] };
+        return { series: [{ ...base, labelsVisible }], warnings: [] };
     }
 
     const { argumentField, valueFields: [valueField] } = base;
@@ -223,6 +224,7 @@ export function splitSeries(
             ...base,
             name: value,
             valueFields: [columnFor.get(value)!],
+            labelsVisible,
         })),
         points,
         warnings,
@@ -239,8 +241,9 @@ export function applySplitSeries(
     context: InstantiateContext,
     channel: string,
     viewType: string,
+    labelsVisible: boolean,
 ): void {
-    const split = splitSeries(context, channel, viewType);
+    const split = splitSeries(context, channel, viewType, labelsVisible);
     plan.series = split.series;
     if (split.points) plan.data = { points: split.points };
     if (split.warnings.length > 0) {
@@ -258,7 +261,7 @@ const barChart: DxTemplateDef = {
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: false });
-        spec.series = [baseSeries(context, 'Bar')];
+        spec.series = [{ ...baseSeries(context, 'Bar'), labelsVisible: true }];
     },
 };
 
@@ -272,7 +275,7 @@ const groupedBarChart: DxTemplateDef = {
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: true });
-        applySplitSeries(spec, context, 'group', 'Bar');
+        applySplitSeries(spec, context, 'group', 'Bar', true);
     },
 };
 
@@ -287,7 +290,7 @@ const stackedBarChart: DxTemplateDef = {
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: true });
         const normalized = context.channelSemantics.y?.stackable === 'normalize';
-        applySplitSeries(spec, context, 'color', normalized ? 'FullStackedBar' : 'StackedBar');
+        applySplitSeries(spec, context, 'color', normalized ? 'FullStackedBar' : 'StackedBar', true);
     },
 };
 

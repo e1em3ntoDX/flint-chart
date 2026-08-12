@@ -30,7 +30,7 @@ function applyCircularFrame(spec: Draft, context: InstantiateContext, viewType: 
         valueFields: [valueField],
         argumentScaleType: 'Qualitative',
         valueScaleType: 'Numerical',
-        labelsVisible: false,
+        labelsVisible: true,
         valueFormat: resolveTooltipFormat(context.channelSemantics.size),
     }];
     spec.titles ??= [];

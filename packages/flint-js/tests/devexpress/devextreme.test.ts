@@ -96,4 +96,44 @@ describe('planToDevExtreme', () => {
         plan.series[0].viewType = 'Waterfall';
         expect(() => planToDevExtreme(plan)).toThrow(/no dxChart series type/);
     });
+
+    it('turns on series labels for Bar with a formatter built from the series valueFormat', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.series[0].valueFormat = { pattern: ',.2f', prefix: '$' };
+        const { options } = planToDevExtreme(plan);
+        const series = options.series as Record<string, unknown>[];
+        const label = series[0].label as { visible: boolean; customizeText: (info: { value: number }) => string };
+        expect(label.visible).toBe(true);
+        expect(label.customizeText({ value: 1234.5 })).toBe('$1,234.50');
+    });
+
+    it('formats the Cartesian tooltip using the hovered series own valueFormat', () => {
+        const plan = assembleDevExpressPlan(groupedInput);
+        plan.series[0].valueFormat = { pattern: ',.0f', prefix: '$' };
+        plan.series[1].valueFormat = { pattern: ',.0f', prefix: '$' };
+        const { options } = planToDevExtreme(plan);
+        const tooltip = options.tooltip as {
+            customizeTooltip: (info: { seriesName: string; value: number }) => { text: string };
+        };
+        expect(tooltip.customizeTooltip({ seriesName: 'North', value: 100 })).toEqual({ text: 'North: $100' });
+        expect(tooltip.customizeTooltip({ seriesName: 'South', value: 75 })).toEqual({ text: 'South: $75' });
+    });
+
+    it('adds a label and tooltip formatter to the Circular projection, which previously had neither', () => {
+        const plan = assembleDevExpressPlan(pieInput);
+        plan.series[0].labelsVisible = true;
+        plan.series[0].valueFormat = { pattern: ',.1f' };
+        const { options } = planToDevExtreme(plan);
+        const series = (options.series as Record<string, unknown>[])[0];
+        const label = series.label as {
+            visible: boolean;
+            customizeText: (info: { argument: string; value: number }) => string;
+        };
+        expect(label.visible).toBe(true);
+        expect(label.customizeText({ argument: 'North', value: 10 })).toBe('North: 10.0');
+        const tooltip = options.tooltip as {
+            customizeTooltip: (info: { argument: string; value: number }) => { text: string };
+        };
+        expect(tooltip.customizeTooltip({ argument: 'North', value: 10 })).toEqual({ text: 'North: 10.0' });
+    });
 });
