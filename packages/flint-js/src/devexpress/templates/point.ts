@@ -5,14 +5,10 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import { binHistogram } from '../transforms';
-import { applyCartesianFrame, baseSeries } from './bar';
+import { applyCartesianFrame, baseSeries, fieldOf } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
-
-function fieldOf(context: InstantiateContext, channel: string): string | undefined {
-    return context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
-}
 
 const scatterPlot: DxTemplateDef = {
     chart: 'Scatter Plot',
@@ -60,7 +56,7 @@ const histogram: DxTemplateDef = {
         const binnedContext: InstantiateContext = { ...context, table: bins };
         applyCartesianFrame(spec, binnedContext, { rotated: false, legend: false });
         spec.series = [{
-            name: 'count',
+            name: 'Count',
             viewType: 'Bar',
             argumentField: 'bin',
             valueFields: ['count'],

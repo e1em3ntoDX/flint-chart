@@ -4,13 +4,10 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
+import { fieldOf, humanizeFieldName } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
-
-function fieldOf(context: InstantiateContext, channel: string): string | undefined {
-    return context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
-}
 
 /**
  * Shared Circular scaffolding. Deliberately does not call applyCartesianFrame:
@@ -26,7 +23,7 @@ function applyCircularFrame(spec: Draft, context: InstantiateContext, viewType: 
     spec.diagram = null;
     spec.legend = { visible: true, position: 'right' };
     spec.series = [{
-        name: valueField,
+        name: humanizeFieldName(valueField)!,
         viewType,
         argumentField,
         valueFields: [valueField],

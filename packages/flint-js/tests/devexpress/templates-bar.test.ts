@@ -60,6 +60,31 @@ describe('Bar Chart template', () => {
             expect(json).not.toContain(forbidden);
         }
     });
+
+    it('humanizes plain field names into axis titles and the series name', () => {
+        const def = dxGetTemplateDef('Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context());
+        expect(plan.diagram!.axisX.title).toBe('Quarter');
+        expect(plan.diagram!.axisY.title).toBe('Revenue');
+        expect(plan.series![0].name).toBe('Revenue');
+    });
+
+    it('humanizes snake_case field names into Title Case', () => {
+        const def = dxGetTemplateDef('Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'fuel_type' }, y: { field: 'units_sold' } },
+            channelSemantics: {
+                x: { field: 'fuel_type', type: 'nominal' } as never,
+                y: { field: 'units_sold', type: 'quantitative', zero: true } as never,
+            },
+            table: [{ fuel_type: 'gas', units_sold: 10 }],
+        }));
+        expect(plan.diagram!.axisX.title).toBe('Fuel Type');
+        expect(plan.diagram!.axisY.title).toBe('Units Sold');
+        expect(plan.series![0].name).toBe('Units Sold');
+    });
 });
 
 /** Long-format rows: North(Q1=100, Q2=150) / South(Q1=200) — South has no Q2. */
@@ -172,6 +197,18 @@ describe('Grouped Bar Chart template', () => {
         expect(plan.data!.points).toEqual([
             { quarter: 'Q1', revenue: 1200 }, { quarter: 'Q2', revenue: 1450 },
         ]);
+    });
+
+    it('does not humanize category values used as split-series names', () => {
+        const def = dxGetTemplateDef('Grouped Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, groupedContext({
+            table: [
+                { quarter: 'Q1', revenue: 100, region: 'north' },
+                { quarter: 'Q1', revenue: 200, region: 'south' },
+            ],
+        }));
+        expect(plan.series!.map((s) => s.name).sort()).toEqual(['north', 'south']);
     });
 });
 

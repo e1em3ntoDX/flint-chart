@@ -177,4 +177,20 @@ describe('Range Area Chart template', () => {
         const def = dxGetTemplateDef('Range Area Chart', 'devextreme')!;
         expect(def.requiredChannels).toContain('y2');
     });
+
+    it('humanizes the range-area series name built from two field names', () => {
+        const def = dxGetTemplateDef('Range Area Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Range Area Chart',
+            encodings: { x: { field: 'month' }, y: { field: 'low' }, y2: { field: 'high' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'low', type: 'quantitative' } as never,
+                y2: { field: 'high', type: 'quantitative' } as never,
+            },
+            table: [{ month: '2026-01', low: 5, high: 15 }],
+        }));
+        expect(plan.series![0].name).toBe('Low–High');
+    });
 });

@@ -12,14 +12,32 @@ import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
 
-function fieldOf(context: InstantiateContext, channel: string): string | undefined {
+export function fieldOf(context: InstantiateContext, channel: string): string | undefined {
     return context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
+}
+
+/**
+ * Turns a raw field name into Title Case for display as an axis title or
+ * series name: `fuel_type` -> "Fuel Type", `avgSessionSeconds` -> "Avg
+ * Session Seconds". Plain word-capitalization only — acronyms like `hp` or
+ * `gwh` become "Hp"/"Gwh" rather than "HP"/"GWh"; an accepted simplification.
+ * Never applied to raw data VALUES (category names), only to field names we
+ * generate display text from ourselves.
+ */
+export function humanizeFieldName(field: string | undefined): string | undefined {
+    if (!field) return field;
+    const words = field
+        .replace(/_/g, ' ')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .split(' ')
+        .filter(Boolean);
+    return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 function axis(context: InstantiateContext, channel: string, applyZero: boolean): AxisPlan {
     const sem = context.channelSemantics[channel];
     return {
-        title: fieldOf(context, channel),
+        title: humanizeFieldName(fieldOf(context, channel)),
         labelFormat: resolveLabelFormat(sem),
         includeZero: applyZero ? resolveIncludeZero(sem) : false,
         logarithmic: resolveLogarithmic(sem),
@@ -77,7 +95,7 @@ export function baseSeries(context: InstantiateContext, viewType: string): Serie
     const argumentField = fieldOf(context, 'x')!;
     const valueField = fieldOf(context, 'y')!;
     return {
-        name: valueField,
+        name: humanizeFieldName(valueField)!,
         viewType,
         argumentField,
         valueFields: [valueField],

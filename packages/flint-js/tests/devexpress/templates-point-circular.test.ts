@@ -90,6 +90,18 @@ describe('Histogram template', () => {
         expect(plan.series![0].argumentScaleType).toBe('Qualitative');
         expect(plan.data!.points.every((p) => 'bin' in p && 'count' in p)).toBe(true);
     });
+
+    it('capitalizes the count series name', () => {
+        const def = dxGetTemplateDef('Histogram', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Histogram',
+            channelSemantics: { x: { field: 'v', type: 'quantitative' } as never },
+            encodings: { x: { field: 'v' } },
+            table: [{ v: 1 }, { v: 2 }],
+        }));
+        expect(plan.series![0].name).toBe('Count');
+    });
 });
 
 describe('Candlestick Chart template', () => {
@@ -118,6 +130,27 @@ describe('Candlestick Chart template', () => {
     it('declares all four financial channels as required', () => {
         const def = dxGetTemplateDef('Candlestick Chart', 'devextreme')!;
         expect(def.requiredChannels).toEqual(expect.arrayContaining(['open', 'high', 'low', 'close']));
+    });
+
+    it('capitalizes the candlestick series name', () => {
+        const def = dxGetTemplateDef('Candlestick Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Candlestick Chart',
+            channelSemantics: {
+                x: { field: 'date', type: 'temporal' } as never,
+                open: { field: 'o', type: 'quantitative' } as never,
+                high: { field: 'h', type: 'quantitative' } as never,
+                low: { field: 'l', type: 'quantitative' } as never,
+                close: { field: 'c', type: 'quantitative' } as never,
+            },
+            encodings: {
+                x: { field: 'date' }, open: { field: 'o' }, high: { field: 'h' },
+                low: { field: 'l' }, close: { field: 'c' },
+            },
+            table: [{ date: '2026-01-01', o: 1, h: 3, l: 0.5, c: 2 }],
+        }));
+        expect(plan.series![0].name).toBe('Candlestick');
     });
 });
 
@@ -149,5 +182,12 @@ describe('Pie and Donut templates', () => {
         const plan = draft();
         def.instantiate(plan, circularContext('Donut Chart'));
         expect(plan.series![0].viewType).toBe('Doughnut');
+    });
+
+    it('humanizes the series name from the size field', () => {
+        const def = dxGetTemplateDef('Pie Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, circularContext('Pie Chart'));
+        expect(plan.series![0].name).toBe('Revenue');
     });
 });

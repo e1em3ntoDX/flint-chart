@@ -5,14 +5,10 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
 import { resolveArgumentScaleType } from '../semantics-bridge';
-import { applyCartesianFrame } from './bar';
+import { applyCartesianFrame, fieldOf } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
-
-function fieldOf(context: InstantiateContext, channel: string): string | undefined {
-    return context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
-}
 
 const candlestickChart: DxTemplateDef = {
     chart: 'Candlestick Chart',
@@ -30,7 +26,7 @@ const candlestickChart: DxTemplateDef = {
         const open = fieldOf(context, 'open')!;
         const close = fieldOf(context, 'close')!;
         spec.series = [{
-            name: 'candlestick',
+            name: 'Candlestick',
             viewType: 'CandleStick',
             argumentField,
             // XtraCharts financial views expect [high, low, open, close], not

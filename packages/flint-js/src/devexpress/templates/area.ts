@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
-import { applyCartesianFrame, applySplitSeries, baseSeries } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName } from './bar';
 import { resolveArgumentScaleType, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -52,7 +52,7 @@ const rangeAreaChart: DxTemplateDef = {
         const low = context.channelSemantics.y!.field;
         const high = context.channelSemantics.y2!.field;
         const series: SeriesPlan = {
-            name: `${low}–${high}`,
+            name: `${humanizeFieldName(low)}–${humanizeFieldName(high)}`,
             viewType: 'RangeArea',
             argumentField,
             valueFields: [low, high],
