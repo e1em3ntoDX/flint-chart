@@ -83,9 +83,29 @@ function cartesianSeries(series: SeriesPlan): Record<string, unknown> {
  */
 function buildCartesianTooltipCustomizer(series: SeriesPlan[]) {
     const formatBySeries = new Map(series.map((s) => [s.name, s.valueFormat]));
-    return (info: { seriesName?: unknown; value?: unknown }) => {
+    return (info: {
+        seriesName?: unknown; value?: unknown;
+        rangeValue1?: unknown; rangeValue2?: unknown;
+        openValue?: unknown; highValue?: unknown; lowValue?: unknown; closeValue?: unknown;
+    }) => {
         const name = String(info.seriesName ?? '');
-        return { text: `${name}: ${formatValue(info.value, formatBySeries.get(name))}` };
+        const fmt = formatBySeries.get(name);
+        // RangeArea/RangeBar tooltips never carry `value` — DevExtreme hands
+        // back rangeValue1/rangeValue2 instead. CandleStick/Stock tooltips
+        // carry openValue/highValue/lowValue/closeValue; `value` does exist
+        // there too (aliased to the close price) but showing only close
+        // silently drops open/high/low, so branch on the OHLC shape first.
+        if (info.rangeValue1 !== undefined || info.rangeValue2 !== undefined) {
+            return { text: `${name}: ${formatValue(info.rangeValue1, fmt)} – ${formatValue(info.rangeValue2, fmt)}` };
+        }
+        if (info.openValue !== undefined || info.highValue !== undefined
+            || info.lowValue !== undefined || info.closeValue !== undefined) {
+            return {
+                text: `${name}\nO: ${formatValue(info.openValue, fmt)}  H: ${formatValue(info.highValue, fmt)}  `
+                    + `L: ${formatValue(info.lowValue, fmt)}  C: ${formatValue(info.closeValue, fmt)}`,
+            };
+        }
+        return { text: `${name}: ${formatValue(info.value, fmt)}` };
     };
 }
 
