@@ -220,6 +220,16 @@ function resolvePaletteColors(decisions: ColorDecisionResult | undefined): strin
     return pickDevExpressPalette(decision);
 }
 
+/** Turns the caller's optional title/subtitle strings into `plan.titles` entries. */
+function buildTitles(title: string | undefined, subtitle: string | undefined): DevExpressChartPlan['titles'] {
+    const titles: DevExpressChartPlan['titles'] = [];
+    const trimmedTitle = title?.trim();
+    const trimmedSubtitle = subtitle?.trim();
+    if (trimmedTitle) titles.push({ text: trimmedTitle, role: 'chart' });
+    if (trimmedSubtitle) titles.push({ text: trimmedSubtitle, role: 'subtitle' });
+    return titles;
+}
+
 export function assembleDevExpressPlan(
     input: ChartAssemblyInput,
     options: AssembleDevExpressOptions = {},
@@ -260,7 +270,7 @@ export function assembleDevExpressPlan(
         schema: DEVEXPRESS_PLAN_SCHEMA,
         chartType,
         target,
-        titles: [],
+        titles: buildTitles(input.chart_spec.title, input.chart_spec.subtitle),
         warnings: pipeline.warnings,
         unsupported: [],
     };

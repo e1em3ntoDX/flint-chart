@@ -10,7 +10,7 @@
  * knows DevExtreme's own series-type strings.
  */
 
-import type { AxisPlan, DevExpressChartPlan, SeriesPlan } from './plan';
+import type { AxisPlan, DevExpressChartPlan, SeriesPlan, TitlePlan } from './plan';
 import { formatValue } from './number-format';
 
 const VIEW_TYPE_TO_DX: Record<string, string> = {
@@ -121,6 +121,14 @@ function axisOptions(axis: AxisPlan, isValueAxis: boolean): Record<string, unkno
     return options;
 }
 
+/** A bare string when there's only a chart title; an object with `subtitle` when both are present; `undefined` when there's no title at all. */
+function titleOptions(titles: TitlePlan[]): Record<string, unknown> | string | undefined {
+    const chartTitle = titles.find((t) => t.role === 'chart')?.text;
+    const subtitle = titles.find((t) => t.role === 'subtitle')?.text;
+    if (!chartTitle) return undefined;
+    return subtitle ? { text: chartTitle, subtitle: { text: subtitle } } : chartTitle;
+}
+
 export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjection {
     if (plan.family === 'Circular') {
         const series = plan.series[0];
@@ -130,7 +138,7 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
                 dataSource: plan.data.points,
                 palette: plan.palette.colors,
                 legend: { visible: plan.legend.visible, position: 'outside' },
-                title: plan.titles.find((t) => t.role === 'chart')?.text,
+                title: titleOptions(plan.titles),
                 tooltip: {
                     enabled: true,
                     customizeTooltip: (info: { argument?: unknown; value?: unknown }) => (
@@ -162,7 +170,7 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
             argumentAxis: axisOptions(diagram.axisX, false),
             valueAxis: axisOptions(diagram.axisY, true),
             legend: { visible: plan.legend.visible, position: 'outside' },
-            title: plan.titles.find((t) => t.role === 'chart')?.text,
+            title: titleOptions(plan.titles),
             tooltip: {
                 enabled: true,
                 customizeTooltip: buildCartesianTooltipCustomizer(plan.series),

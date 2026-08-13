@@ -104,6 +104,19 @@ describe('assembleDevExpressPlan', () => {
         expect(plan.unsupported).toEqual([]);
         expect(Array.isArray(plan.warnings)).toBe(true);
     });
+
+    it('populates plan.titles from chart_spec.title and .subtitle', () => {
+        const plan = assembleDevExpressPlan(input({ title: 'Quarterly Revenue', subtitle: 'By region, 2026' }));
+        expect(plan.titles).toEqual([
+            { text: 'Quarterly Revenue', role: 'chart' },
+            { text: 'By region, 2026', role: 'subtitle' },
+        ]);
+    });
+
+    it('leaves plan.titles empty when no title is given, exactly as before', () => {
+        const plan = assembleDevExpressPlan(input());
+        expect(plan.titles).toEqual([]);
+    });
 });
 
 describe('assembleDevExpressPlan aggregation', () => {

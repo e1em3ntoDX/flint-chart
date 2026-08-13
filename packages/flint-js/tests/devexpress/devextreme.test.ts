@@ -225,4 +225,21 @@ describe('planToDevExtreme', () => {
         };
         expect(tooltip.customizeTooltip({ argument: 'North', value: 10 })).toEqual({ text: 'North: 10.0' });
     });
+
+    it('projects a chart title with no subtitle as a plain string, exactly as before', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.titles = [{ text: 'Quarterly Revenue', role: 'chart' }];
+        const { options } = planToDevExtreme(plan);
+        expect(options.title).toBe('Quarterly Revenue');
+    });
+
+    it('projects a subtitle alongside the chart title', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.titles = [
+            { text: 'Quarterly Revenue', role: 'chart' },
+            { text: 'By region, 2026', role: 'subtitle' },
+        ];
+        const { options } = planToDevExtreme(plan);
+        expect(options.title).toEqual({ text: 'Quarterly Revenue', subtitle: { text: 'By region, 2026' } });
+    });
 });
