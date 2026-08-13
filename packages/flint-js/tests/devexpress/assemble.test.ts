@@ -155,6 +155,55 @@ describe('assembleDevExpressPlan', () => {
         });
         expect(plan.series.map((s) => s.name).sort()).toEqual(['North', 'South']);
     });
+
+    it('does not let a field_display_names override for the y field mangle Range Area\'s dual-field composite series name', () => {
+        // Range Area Chart is the only template with a y2 channel, and its
+        // series name is a hyphenated composite of BOTH y and y2's humanized
+        // field names (`${low}–${high}`), built by rangeAreaChart's
+        // instantiate(). Per the plan's own Task 4 design note, this dual-field
+        // name is out of scope for field_display_names (it keys on one real
+        // field, and neither of the two here unambiguously fits) — so an
+        // override naming only the y field must NOT overwrite it.
+        const plan = assembleDevExpressPlan({
+            data: {
+                values: [
+                    { day: 'Mon', temp_min: 10, temp_max: 20 },
+                    { day: 'Tue', temp_min: 12, temp_max: 22 },
+                ],
+            },
+            semantic_types: { day: 'Category', temp_min: 'Temperature', temp_max: 'Temperature' },
+            chart_spec: {
+                chartType: 'Range Area Chart',
+                encodings: { x: { field: 'day' }, y: { field: 'temp_min' }, y2: { field: 'temp_max' } },
+            },
+            field_display_names: { temp_min: 'Minimum Temperature', temp_max: 'Maximum Temperature' },
+        } as never);
+        expect(plan.series[0].name).toBe('Temp Min–Temp Max');
+    });
+
+    it('still overrides a Bubble scatter\'s single-field-derived series name (y2 guard must not overcorrect)', () => {
+        // Bubble scatter (Scatter Plot template with a size encoding) also has
+        // valueFields.length === 2 ([y, sizeField]), like Range Area, but its
+        // series name is genuinely just the humanized y field alone (via
+        // baseSeries()) — no y2 channel is involved. This confirms the y2-guard
+        // added for Range Area doesn't also incorrectly suppress this
+        // still-valid override.
+        const plan = assembleDevExpressPlan({
+            data: {
+                values: [
+                    { revenue: 100, profit: 10 },
+                    { revenue: 200, profit: 20 },
+                ],
+            },
+            semantic_types: { revenue: 'Price', profit: 'Price' },
+            chart_spec: {
+                chartType: 'Scatter Plot',
+                encodings: { x: { field: 'revenue' }, y: { field: 'revenue' }, size: { field: 'profit' } },
+            },
+            field_display_names: { revenue: 'Net Revenue' },
+        } as never);
+        expect(plan.series[0].name).toBe('Net Revenue');
+    });
 });
 
 describe('assembleDevExpressPlan aggregation', () => {
@@ -309,6 +358,33 @@ describe('assembleDevExpressPlan palette', () => {
             '#006ba2', '#3ebcd2', '#ebb434', '#379a8b', '#9a3d5b', '#a17ba5',
         ]);
         expect(plan.palette.colors.length).toBeGreaterThan(0);
+    });
+
+    it('falls through to the capacity-aware default picker when a theme\'s categorical set is too small for the chart\'s real category count', () => {
+        // Economist has exactly 6 categorical colors (core/theme/presets/economist.ts).
+        // A chart with 12 distinct categories must NOT get just those 6 colors
+        // (which DevExtreme would cycle, silently pairing up two categories on
+        // the same color) — it must fall through to colormap.ts's own
+        // capacity-aware picker instead, same as the un-themed high-cardinality
+        // case above.
+        const values = Array.from({ length: 12 }, (_, i) => ({
+            category: `cat-${i}`,
+            month: 'Jan',
+            metric: 10 + i,
+        }));
+        const plan = assembleDevExpressPlan({
+            data: { values },
+            semantic_types: { category: 'Category', month: 'Category', metric: 'Quantity' },
+            chart_spec: {
+                chartType: 'Pie Chart',
+                encodings: { color: { field: 'category' }, size: { field: 'metric', aggregate: 'sum' } },
+            },
+            theme_spec: 'economist',
+        } as never);
+        expect(plan.palette.colors.length).toBeGreaterThanOrEqual(12);
+        expect(plan.palette.colors).not.toEqual([
+            '#006ba2', '#3ebcd2', '#ebb434', '#379a8b', '#9a3d5b', '#a17ba5',
+        ]);
     });
 
     it('reports an unsupported note naming what a theme_spec could not apply', () => {

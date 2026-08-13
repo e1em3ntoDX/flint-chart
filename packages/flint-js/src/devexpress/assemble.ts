@@ -213,22 +213,21 @@ function runCoreStages(
 }
 
 /**
- * Concrete swatches for the plan's palette. Delegates the actual pick to
- * `colormap.ts`, which knows how to turn core's abstract scheme
- * type/id/categoryCount into real DevExpress-appropriate hex values.
+ * Concrete swatches for the plan's palette. Prefers a resolved theme's own
+ * colors when present and large enough for the chart's real category count;
+ * otherwise delegates to `colormap.ts`, which knows how to turn core's
+ * abstract scheme type/id/categoryCount into real DevExpress-appropriate hex
+ * values (including the polarity-aware diverging pick).
  */
 function resolvePaletteColors(
     decisions: ColorDecisionResult | undefined,
     channelSemantics: Record<string, ChannelSemantics>,
     theme: ThemeSpec | undefined,
 ): string[] {
-    const channelName = decisions?.color ? 'color' : decisions?.group ? 'group'
-        : decisions?.fill ? 'fill' : decisions?.stroke ? 'stroke' : undefined;
-    const decision = channelName
-        ? (decisions as unknown as Record<string, ColorDecision>)[channelName]
-        : undefined;
+    const decision = primaryColorDecision(decisions);
+    const channelName = decision?.channel;
 
-    const themeColors = themePaletteColors(theme, decision?.schemeType);
+    const themeColors = themePaletteColors(theme, decision?.schemeType, decision?.categoryCount);
     if (themeColors) return [...themeColors];
 
     // Only override when the decision is diverging AND the caller didn't already
@@ -239,6 +238,11 @@ function resolvePaletteColors(
         if (scheme) return pickDevExpressPalette({ ...decision, schemeId: scheme });
     }
     return pickDevExpressPalette(decision);
+}
+
+/** Picks whichever channel actually got a color decision (color > group > fill > stroke). */
+function primaryColorDecision(decisions: ColorDecisionResult | undefined): ColorDecision | undefined {
+    return decisions?.color ?? decisions?.group ?? decisions?.fill ?? decisions?.stroke;
 }
 
 /** Turns the caller's optional title/subtitle strings into `plan.titles` entries. */
@@ -279,20 +283,30 @@ function applyFieldDisplayNames(
     if (draft.family === 'Circular') {
         const sizeOverride = overrideFor(fieldOfChannel('size'));
         if (sizeOverride && draft.series?.[0]) draft.series[0].name = sizeOverride;
-    } else if (draft.series && draft.series.length === 1) {
+    } else if (draft.series && draft.series.length === 1 && !fieldOfChannel('y2')) {
         const yOverride = overrideFor(fieldOfChannel('y'));
         if (yOverride) draft.series[0].name = yOverride;
     }
 }
 
 /** Pulls a resolved theme's colour set into the same shape pickDevExpressPalette already reads. */
-function themePaletteColors(theme: ThemeSpec | undefined, schemeType: string | undefined): string[] | undefined {
+function themePaletteColors(
+    theme: ThemeSpec | undefined,
+    schemeType: string | undefined,
+    categoryCount: number | undefined,
+): string[] | undefined {
     const series = theme?.ink?.series;
     if (!series) return undefined;
     if (schemeType === 'sequential' && series.sequential?.stops?.length) return series.sequential.stops;
     if (schemeType === 'diverging' && series.diverging?.stops?.length) return series.diverging.stops;
-    if (series.categorical?.length) return series.categorical;
-    return undefined;
+    if (!series.categorical?.length) return undefined;
+    // A theme's fixed categorical set must still keep every category visually
+    // distinct — if it's too small for this chart's real category count, fall
+    // through to the backend's own capacity-aware picker (colormap.ts's
+    // byCapacity/byDescendingCapacity logic) instead of letting series
+    // silently share a color.
+    if (schemeType === 'categorical' && series.categorical.length < (categoryCount ?? 0)) return undefined;
+    return series.categorical;
 }
 
 export function assembleDevExpressPlan(
@@ -343,6 +357,14 @@ export function assembleDevExpressPlan(
         warnings: pipeline.warnings,
         unsupported: [],
     };
+
+    // Stage 3: the template fills family, data, series, diagram, legend.
+    def.instantiate(draft, context);
+    def.postProcess?.(draft, context);
+
+    // Pushed after the template runs (and after ??=-guarded reassignment risk),
+    // so a future template that does `draft.unsupported = []` instead of `??= []`
+    // can no longer silently clobber this note.
     if (theme) {
         const themeSpecInput = input.theme_spec;
         const themeName = typeof themeSpecInput === 'string' ? themeSpecInput : (theme.id ?? theme.label ?? 'custom theme');
@@ -354,10 +376,6 @@ export function assembleDevExpressPlan(
                 'the DevExpress backend.',
         });
     }
-
-    // Stage 3: the template fills family, data, series, diagram, legend.
-    def.instantiate(draft, context);
-    def.postProcess?.(draft, context);
 
     applyFieldDisplayNames(draft, context, input.field_display_names);
 
