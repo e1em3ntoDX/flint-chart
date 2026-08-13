@@ -124,3 +124,16 @@ export function resolvePaletteClass(sem: Loose | undefined): PalettePlan['class'
     if (raw === 'sequential' || raw === 'diverging' || raw === 'categorical') return raw;
     return 'categorical';
 }
+
+/**
+ * The real, polarity-aware diverging scheme name core computes per channel
+ * (e.g. `'blueorange'` for a warm-high intensity measure, `'redblue'` for a
+ * signed/valence one) — confirmed at `core/semantic-types.ts`'s `getRecommendedColorScheme`,
+ * distinct from (and unrelated to) `ColorDecision.schemeId`, which core leaves
+ * unset on the auto-decision path every chat-generated chart takes.
+ */
+export function resolveDivergingScheme(sem: Loose | undefined): string | undefined {
+    const scheme = asRecord(sem?.colorScheme);
+    const value = scheme?.scheme;
+    return typeof value === 'string' ? value : undefined;
+}

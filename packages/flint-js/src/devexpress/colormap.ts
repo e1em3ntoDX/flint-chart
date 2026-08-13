@@ -53,12 +53,21 @@ const DEVEXPRESS_COLOR_MAPS: DevExpressColorMapDef[] = [
         ],
     },
     {
-        id: 'rdbu',
+        id: 'redblue',
         type: 'diverging',
         diverging: true,
         colors: [
             '#b2182b', '#d6604d', '#f4a582', '#fddbc7', '#f7f7f7',
             '#d1e5f0', '#92c5de', '#4393c3', '#2166ac',
+        ],
+    },
+    {
+        id: 'blueorange',
+        type: 'diverging',
+        diverging: true,
+        colors: [
+            '#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#f7f7f7',
+            '#fee0b6', '#fdb863', '#e08214', '#b35806',
         ],
     },
 ];
@@ -116,7 +125,10 @@ export function pickDevExpressPalette(decision: ColorDecision | undefined): stri
             return [...seq.colors];
         }
     } else if (schemeType === 'diverging') {
-        const div = mapsOfType.find((m) => m.diverging) ?? getMapById('rdbu');
+        // No explicit schemeId (the common case: this is the auto-decision path
+        // every chat-generated chart takes) defaults to redblue, unchanged from
+        // before this task — blueorange is only reachable via an explicit schemeId.
+        const div = getMapById('redblue') ?? mapsOfType.find((m) => m.diverging);
         if (div && div.colors.length > 0) {
             return [...div.colors];
         }

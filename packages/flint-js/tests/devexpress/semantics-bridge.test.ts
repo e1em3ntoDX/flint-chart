@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     resolveIncludeZero, resolveLabelFormat, resolveLogarithmic, resolveTooltipFormat,
-    resolveArgumentScaleType, resolveValueScaleType, resolvePaletteClass,
+    resolveDivergingScheme, resolveArgumentScaleType, resolveValueScaleType, resolvePaletteClass,
 } from '../../src/devexpress/semantics-bridge';
 
 describe('resolveIncludeZero', () => {
@@ -153,5 +153,22 @@ describe('resolveLogarithmic and resolvePaletteClass', () => {
             domainMid: 0,
         };
         expect(resolvePaletteClass({ colorScheme } as never)).toBe('diverging');
+    });
+});
+
+describe('resolveDivergingScheme', () => {
+    it('is undefined when no colorScheme is present', () => {
+        expect(resolveDivergingScheme(undefined)).toBeUndefined();
+        expect(resolveDivergingScheme({} as never)).toBeUndefined();
+    });
+
+    it('reads the real scheme name for a warm-high (intensity) measure', () => {
+        const colorScheme = { scheme: 'blueorange', type: 'diverging', reason: 'measure with no valence, warm end high' };
+        expect(resolveDivergingScheme({ colorScheme } as never)).toBe('blueorange');
+    });
+
+    it('reads the real scheme name for a warm-low (signed/valence) measure', () => {
+        const colorScheme = { scheme: 'redblue', type: 'diverging', reason: 'signed measure, red is the negative side' };
+        expect(resolveDivergingScheme({ colorScheme } as never)).toBe('redblue');
     });
 });

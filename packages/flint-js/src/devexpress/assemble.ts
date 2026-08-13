@@ -8,7 +8,7 @@ import type {
 } from '../core/types';
 import { applyAggregation } from '../core/aggregate';
 import { applyEncodingOverrides } from '../core/encoding-overrides';
-import { decideColorMaps, type ColorDecisionResult } from '../core/color-decisions';
+import { decideColorMaps, type ColorDecision, type ColorDecisionResult } from '../core/color-decisions';
 import { computeChannelBudgets, computeLayout } from '../core/compute-layout';
 import { filterOverflow } from '../core/filter-overflow';
 import { convertTemporalData, resolveChannelSemantics } from '../core/resolve-semantics';
@@ -19,7 +19,7 @@ import { pickDevExpressPalette } from './colormap';
 import {
     DEVEXPRESS_PLAN_SCHEMA, type DevExpressChartPlan, type RenderTarget,
 } from './plan';
-import { resolvePaletteClass } from './semantics-bridge';
+import { resolveDivergingScheme, resolvePaletteClass } from './semantics-bridge';
 import { assertNoFacets, assertRequiredChannels, dxGetTemplateDef, type DxTemplateDef } from './templates';
 
 export interface AssembleDevExpressOptions {
@@ -206,7 +206,7 @@ function runCoreStages(
         encodings,
         colorDecisions,
         warnings,
-        paletteColors: resolvePaletteColors(colorDecisions),
+        paletteColors: resolvePaletteColors(colorDecisions, channelSemantics),
     };
 }
 
@@ -215,8 +215,23 @@ function runCoreStages(
  * `colormap.ts`, which knows how to turn core's abstract scheme
  * type/id/categoryCount into real DevExpress-appropriate hex values.
  */
-function resolvePaletteColors(decisions: ColorDecisionResult | undefined): string[] {
-    const decision = decisions?.color ?? decisions?.group ?? decisions?.fill ?? decisions?.stroke;
+function resolvePaletteColors(
+    decisions: ColorDecisionResult | undefined,
+    channelSemantics: Record<string, ChannelSemantics>,
+): string[] {
+    const channelName = decisions?.color ? 'color' : decisions?.group ? 'group'
+        : decisions?.fill ? 'fill' : decisions?.stroke ? 'stroke' : undefined;
+    const decision = channelName
+        ? (decisions as unknown as Record<string, ColorDecision>)[channelName]
+        : undefined;
+
+    // Only override when the decision is diverging AND the caller didn't already
+    // name an explicit scheme — an explicit schemeId (set only when a caller asks
+    // for one directly) must keep winning over our own auto-derived polarity pick.
+    if (decision && decision.schemeType === 'diverging' && !decision.schemeId && channelName) {
+        const scheme = resolveDivergingScheme(channelSemantics[channelName]);
+        if (scheme) return pickDevExpressPalette({ ...decision, schemeId: scheme });
+    }
     return pickDevExpressPalette(decision);
 }
 

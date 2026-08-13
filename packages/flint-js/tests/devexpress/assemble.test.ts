@@ -259,4 +259,39 @@ describe('assembleDevExpressPlan palette', () => {
         ]);
         expect(plan.palette.colors.length).toBeGreaterThanOrEqual(12);
     });
+
+    it('picks the warm-high diverging ramp for a plain intensity measure, end to end', () => {
+        // 'Quantity' (core/type-registry.ts) is a real semantic type whose t1
+        // is 'Physical', not 'SignedMeasure'. core/semantic-types.ts's
+        // getRecommendedColorScheme only takes the DIVERGING_WARM_LOW
+        // ('redblue') branch when the registry entry's t1 is 'SignedMeasure'
+        // (e.g. Profit, Sentiment); every other measure that straddles zero —
+        // a plain Quantity among them — falls into the "no valence" branch and
+        // gets DIVERGING_WARM_HIGH ('blueorange') instead. Data has to
+        // actually straddle zero for core/field-semantics.ts's
+        // resolveDivergingInfo to report a midpoint at all for a
+        // diverging:'none' type like Quantity (its only path there is the
+        // data-driven "min < 0 < max" case). And a 'color' encoding on the
+        // field is required in the first place: decideColorMaps
+        // (core/color-decisions.ts) only ever produces a decision for the
+        // 'color'/'group' channels, so with no such encoding this pipeline
+        // never reaches a diverging ColorDecision at all.
+        const values = [
+            { quarter: 'Q1', usage: -20 },
+            { quarter: 'Q2', usage: 15 },
+            { quarter: 'Q3', usage: -5 },
+            { quarter: 'Q4', usage: 40 },
+        ];
+        const plan = assembleDevExpressPlan({
+            data: { values },
+            semantic_types: { quarter: 'Quarter', usage: 'Quantity' },
+            chart_spec: {
+                chartType: 'Bar Chart',
+                encodings: { x: { field: 'quarter' }, y: { field: 'usage' }, color: { field: 'usage' } },
+            },
+        } as never);
+        expect(plan.palette.class).toBe('diverging');
+        expect(plan.palette.colors[0]).not.toBe('#b2182b'); // not the redblue ramp's red start
+        expect(plan.palette.colors[0]).toBe('#2166ac'); // the blueorange ramp's blue start
+    });
 });
