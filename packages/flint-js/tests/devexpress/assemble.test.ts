@@ -294,4 +294,44 @@ describe('assembleDevExpressPlan palette', () => {
         expect(plan.palette.colors[0]).not.toBe('#b2182b'); // not the redblue ramp's red start
         expect(plan.palette.colors[0]).toBe('#2166ac'); // the blueorange ramp's blue start
     });
+
+    it('applies a theme_spec\'s resolved palette instead of the default ramp', () => {
+        const plan = assembleDevExpressPlan({
+            ...input({
+                chartType: 'Grouped Bar Chart',
+                encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, group: { field: 'region' } },
+            }),
+            theme_spec: 'economist',
+        });
+        // The Economist preset's real ink.series.categorical colors — read
+        // verbatim from core/theme/presets/economist.ts at the merged 0.5 tree.
+        expect(plan.palette.colors).toEqual([
+            '#006ba2', '#3ebcd2', '#ebb434', '#379a8b', '#9a3d5b', '#a17ba5',
+        ]);
+        expect(plan.palette.colors.length).toBeGreaterThan(0);
+    });
+
+    it('reports an unsupported note naming what a theme_spec could not apply', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            theme_spec: 'economist',
+        });
+        const themeNote = plan.unsupported.find((u) => u.feature === 'theme_spec');
+        expect(themeNote).toBeDefined();
+        expect(themeNote!.action).toBe('downgraded');
+        expect(themeNote!.detail).toMatch(/economist/i);
+    });
+
+    it('accepts a full ThemeSpec object, not just a preset name string', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            theme_spec: { extends: 'economist', ink: { series: { categorical: ['#111111', '#222222'] } } },
+        });
+        expect(plan.palette.colors).toEqual(['#111111', '#222222']);
+    });
+
+    it('leaves the palette and unsupported list untouched when no theme_spec is given, exactly as before', () => {
+        const plan = assembleDevExpressPlan(input());
+        expect(plan.unsupported.find((u) => u.feature === 'theme_spec')).toBeUndefined();
+    });
 });

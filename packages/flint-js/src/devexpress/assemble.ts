@@ -6,6 +6,7 @@ import type {
     AssembleOptions, ChannelSemantics, ChartAssemblyInput, ChartEncoding, ChartWarning,
     InstantiateContext, LayoutDeclaration, LayoutResult, MarkCognitiveChannel,
 } from '../core/types';
+import { resolveThemeSpec, type ThemeSpec } from '../core/theme';
 import { applyAggregation } from '../core/aggregate';
 import { applyEncodingOverrides } from '../core/encoding-overrides';
 import { decideColorMaps, type ColorDecision, type ColorDecisionResult } from '../core/color-decisions';
@@ -78,6 +79,7 @@ function runCoreStages(
     input: ChartAssemblyInput,
     def: DxTemplateDef,
     chartType: string,
+    theme: ThemeSpec | undefined,
 ): CoreStageResult {
     const semanticTypes = input.semantic_types ?? {};
     const chartProperties = input.chart_spec.chartProperties;
@@ -206,7 +208,7 @@ function runCoreStages(
         encodings,
         colorDecisions,
         warnings,
-        paletteColors: resolvePaletteColors(colorDecisions, channelSemantics),
+        paletteColors: resolvePaletteColors(colorDecisions, channelSemantics, theme),
     };
 }
 
@@ -218,12 +220,16 @@ function runCoreStages(
 function resolvePaletteColors(
     decisions: ColorDecisionResult | undefined,
     channelSemantics: Record<string, ChannelSemantics>,
+    theme: ThemeSpec | undefined,
 ): string[] {
     const channelName = decisions?.color ? 'color' : decisions?.group ? 'group'
         : decisions?.fill ? 'fill' : decisions?.stroke ? 'stroke' : undefined;
     const decision = channelName
         ? (decisions as unknown as Record<string, ColorDecision>)[channelName]
         : undefined;
+
+    const themeColors = themePaletteColors(theme, decision?.schemeType);
+    if (themeColors) return [...themeColors];
 
     // Only override when the decision is diverging AND the caller didn't already
     // name an explicit scheme — an explicit schemeId (set only when a caller asks
@@ -279,6 +285,16 @@ function applyFieldDisplayNames(
     }
 }
 
+/** Pulls a resolved theme's colour set into the same shape pickDevExpressPalette already reads. */
+function themePaletteColors(theme: ThemeSpec | undefined, schemeType: string | undefined): string[] | undefined {
+    const series = theme?.ink?.series;
+    if (!series) return undefined;
+    if (schemeType === 'sequential' && series.sequential?.stops?.length) return series.sequential.stops;
+    if (schemeType === 'diverging' && series.diverging?.stops?.length) return series.diverging.stops;
+    if (series.categorical?.length) return series.categorical;
+    return undefined;
+}
+
 export function assembleDevExpressPlan(
     input: ChartAssemblyInput,
     options: AssembleDevExpressOptions = {},
@@ -297,8 +313,12 @@ export function assembleDevExpressPlan(
     }
     assertRequiredChannels(def, encodings);
 
+    // theme_spec sits beside chart_spec on ChartAssemblyInput, not inside it —
+    // confirmed directly against the real merged 0.5 type during planning.
+    // Resolved before runCoreStages, which needs it for the palette pick.
+    const theme = resolveThemeSpec(input.theme_spec);
     // Stages 1-2: run core unchanged. See docs/flint-api-notes.md for exact signatures.
-    const pipeline = runCoreStages(input, def, chartType);
+    const pipeline = runCoreStages(input, def, chartType, theme);
 
     const context: InstantiateContext = {
         channelSemantics: pipeline.channelSemantics,
@@ -323,6 +343,17 @@ export function assembleDevExpressPlan(
         warnings: pipeline.warnings,
         unsupported: [],
     };
+    if (theme) {
+        const themeSpecInput = input.theme_spec;
+        const themeName = typeof themeSpecInput === 'string' ? themeSpecInput : (theme.id ?? theme.label ?? 'custom theme');
+        draft.unsupported!.push({
+            feature: 'theme_spec',
+            action: 'downgraded',
+            detail: `Theme "${themeName}" requested — only its color palette was applied. Typography, ` +
+                'axis/legend/data-label styling, mark geometry, and furniture are not yet supported by ' +
+                'the DevExpress backend.',
+        });
+    }
 
     // Stage 3: the template fills family, data, series, diagram, legend.
     def.instantiate(draft, context);
