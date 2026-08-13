@@ -230,6 +230,40 @@ function buildTitles(title: string | undefined, subtitle: string | undefined): D
     return titles;
 }
 
+/**
+ * Overrides field-derived axis titles and single-series names with a
+ * caller-supplied display name, when one was given for that field — falling
+ * back to whatever humanizeFieldName() already produced otherwise. Split
+ * series names (raw category values) are never touched here: field_display_names
+ * keys on a real field name, and a category value only coincidentally
+ * matching one would be a wrong override, not a display-name request.
+ */
+function applyFieldDisplayNames(
+    draft: Partial<DevExpressChartPlan>,
+    context: InstantiateContext,
+    fieldDisplayNames: Record<string, string> | undefined,
+): void {
+    if (!fieldDisplayNames) return;
+    const overrideFor = (field: string | undefined): string | undefined =>
+        field ? fieldDisplayNames[field] : undefined;
+    const fieldOfChannel = (channel: string): string | undefined =>
+        context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
+
+    if (draft.diagram) {
+        const xOverride = overrideFor(fieldOfChannel('x'));
+        const yOverride = overrideFor(fieldOfChannel('y'));
+        if (xOverride) draft.diagram.axisX.title = xOverride;
+        if (yOverride) draft.diagram.axisY.title = yOverride;
+    }
+    if (draft.family === 'Circular') {
+        const sizeOverride = overrideFor(fieldOfChannel('size'));
+        if (sizeOverride && draft.series?.[0]) draft.series[0].name = sizeOverride;
+    } else if (draft.series && draft.series.length === 1) {
+        const yOverride = overrideFor(fieldOfChannel('y'));
+        if (yOverride) draft.series[0].name = yOverride;
+    }
+}
+
 export function assembleDevExpressPlan(
     input: ChartAssemblyInput,
     options: AssembleDevExpressOptions = {},
@@ -278,6 +312,8 @@ export function assembleDevExpressPlan(
     // Stage 3: the template fills family, data, series, diagram, legend.
     def.instantiate(draft, context);
     def.postProcess?.(draft, context);
+
+    applyFieldDisplayNames(draft, context, input.field_display_names);
 
     draft.palette ??= {
         class: resolvePaletteClass(context.channelSemantics.color),

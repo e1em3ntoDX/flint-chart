@@ -117,6 +117,44 @@ describe('assembleDevExpressPlan', () => {
         const plan = assembleDevExpressPlan(input());
         expect(plan.titles).toEqual([]);
     });
+
+    it('uses a field_display_names override for the axis titles instead of the humanized field name', () => {
+        const base = input();
+        const plan = assembleDevExpressPlan({
+            ...base,
+            field_display_names: { quarter: 'Fiscal Quarter', revenue: 'Net Revenue' },
+        });
+        expect(plan.diagram!.axisX.title).toBe('Fiscal Quarter');
+        expect(plan.diagram!.axisY.title).toBe('Net Revenue');
+    });
+
+    it('falls back to humanizeFieldName when no override is given for a field', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            field_display_names: { quarter: 'Fiscal Quarter' },
+        });
+        expect(plan.diagram!.axisX.title).toBe('Fiscal Quarter');
+        expect(plan.diagram!.axisY.title).toBe('Revenue');
+    });
+
+    it('overrides an unsplit series name the same way', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            field_display_names: { revenue: 'Net Revenue' },
+        });
+        expect(plan.series[0].name).toBe('Net Revenue');
+    });
+
+    it('does not override a split series name, since it is a raw category value, not a field name', () => {
+        const plan = assembleDevExpressPlan({
+            ...input({
+                chartType: 'Grouped Bar Chart',
+                encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, group: { field: 'region' } },
+            }),
+            field_display_names: { North: 'Should Not Apply' },
+        });
+        expect(plan.series.map((s) => s.name).sort()).toEqual(['North', 'South']);
+    });
 });
 
 describe('assembleDevExpressPlan aggregation', () => {
