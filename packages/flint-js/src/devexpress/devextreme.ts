@@ -10,7 +10,7 @@
  * knows DevExtreme's own series-type strings.
  */
 
-import type { AxisPlan, DevExpressChartPlan, SeriesPlan, TitlePlan } from './plan';
+import type { AxisPlan, DevExpressChartPlan, FontSpec, SeriesPlan, TitlePlan, TypographyPlan } from './plan';
 import { formatValue } from './number-format';
 
 const VIEW_TYPE_TO_DX: Record<string, string> = {
@@ -45,16 +45,18 @@ function dxSeriesType(viewType: string): string {
     return mapped;
 }
 
-function cartesianSeries(series: SeriesPlan): Record<string, unknown> {
+function cartesianSeries(series: SeriesPlan, dataLabelFont: FontSpec | undefined): Record<string, unknown> {
     const type = dxSeriesType(series.viewType);
+    const label: Record<string, unknown> = {
+        visible: series.labelsVisible,
+        customizeText: (info: { value?: unknown }) => formatValue(info.value, series.valueFormat),
+    };
+    if (dataLabelFont) label.font = dataLabelFont;
     const base: Record<string, unknown> = {
         name: series.name,
         type,
         argumentField: series.argumentField,
-        label: {
-            visible: series.labelsVisible,
-            customizeText: (info: { value?: unknown }) => formatValue(info.value, series.valueFormat),
-        },
+        label,
     };
     if (series.color) base.color = series.color;
 
@@ -109,36 +111,61 @@ function buildCartesianTooltipCustomizer(series: SeriesPlan[]) {
     };
 }
 
-function axisOptions(axis: AxisPlan, isValueAxis: boolean): Record<string, unknown> {
+function axisOptions(
+    axis: AxisPlan, isValueAxis: boolean,
+    labelFont: FontSpec | undefined, titleFont: FontSpec | undefined,
+): Record<string, unknown> {
     const options: Record<string, unknown> = {
-        title: axis.title,
+        title: titleFont && axis.title ? { text: axis.title, font: titleFont } : axis.title,
         grid: { visible: axis.gridLines },
         inverted: axis.reverse,
     };
-    if (axis.labelFormat) options.label = { format: axis.labelFormat };
+    const label: Record<string, unknown> = {};
+    if (axis.labelFormat) label.format = axis.labelFormat;
+    if (labelFont) label.font = labelFont;
+    if (Object.keys(label).length > 0) options.label = label;
     if (axis.logarithmic) options.type = 'logarithmic';
     if (isValueAxis) options.showZero = axis.includeZero;
     return options;
 }
 
-/** A bare string when there's only a chart title; an object with `subtitle` when both are present; `undefined` when there's no title at all. */
-function titleOptions(titles: TitlePlan[]): Record<string, unknown> | string | undefined {
+/** A bare string when there's only a chart title and no font; an object with `font`/`subtitle` when either is present; `undefined` when there's no title at all. */
+function titleOptions(titles: TitlePlan[], typography: TypographyPlan): Record<string, unknown> | string | undefined {
     const chartTitle = titles.find((t) => t.role === 'chart')?.text;
-    const subtitle = titles.find((t) => t.role === 'subtitle')?.text;
+    const subtitleText = titles.find((t) => t.role === 'subtitle')?.text;
     if (!chartTitle) return undefined;
-    return subtitle ? { text: chartTitle, subtitle: { text: subtitle } } : chartTitle;
+    const titleFont = typography.title;
+    const subtitleFont = typography.subtitle;
+    if (!subtitleText && !titleFont) return chartTitle;
+    const result: Record<string, unknown> = { text: chartTitle };
+    if (titleFont) result.font = titleFont;
+    if (subtitleText) {
+        const subtitle: Record<string, unknown> = { text: subtitleText };
+        if (subtitleFont) subtitle.font = subtitleFont;
+        result.subtitle = subtitle;
+    }
+    return result;
 }
 
 export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjection {
     if (plan.family === 'Circular') {
         const series = plan.series[0];
+        const circularLabel: Record<string, unknown> = {
+            visible: series.labelsVisible,
+            customizeText: (info: { argument?: unknown; value?: unknown }) => (
+                `${info.argument}: ${formatValue(info.value, series.valueFormat)}`
+            ),
+        };
+        if (plan.typography.dataLabel) circularLabel.font = plan.typography.dataLabel;
+        const circularLegend: Record<string, unknown> = { visible: plan.legend.visible, position: 'outside' };
+        if (plan.typography.legend) circularLegend.font = plan.typography.legend;
         return {
             component: 'dxPieChart',
             options: {
                 dataSource: plan.data.points,
                 palette: plan.palette.colors,
-                legend: { visible: plan.legend.visible, position: 'outside' },
-                title: titleOptions(plan.titles),
+                legend: circularLegend,
+                title: titleOptions(plan.titles, plan.typography),
                 tooltip: {
                     enabled: true,
                     customizeTooltip: (info: { argument?: unknown; value?: unknown }) => (
@@ -149,33 +176,30 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
                     type: dxSeriesType(series.viewType),
                     argumentField: series.argumentField,
                     valueField: series.valueFields[0],
-                    label: {
-                        visible: series.labelsVisible,
-                        customizeText: (info: { argument?: unknown; value?: unknown }) => (
-                            `${info.argument}: ${formatValue(info.value, series.valueFormat)}`
-                        ),
-                    },
+                    label: circularLabel,
                 }],
             },
         };
     }
 
     const diagram = plan.diagram!;
+    const cartesianLegend: Record<string, unknown> = { visible: plan.legend.visible, position: 'outside' };
+    if (plan.typography.legend) cartesianLegend.font = plan.typography.legend;
     return {
         component: 'dxChart',
         options: {
             dataSource: plan.data.points,
             palette: plan.palette.colors,
             rotated: diagram.rotated,
-            argumentAxis: axisOptions(diagram.axisX, false),
-            valueAxis: axisOptions(diagram.axisY, true),
-            legend: { visible: plan.legend.visible, position: 'outside' },
-            title: titleOptions(plan.titles),
+            argumentAxis: axisOptions(diagram.axisX, false, plan.typography.axisLabel, plan.typography.axisTitle),
+            valueAxis: axisOptions(diagram.axisY, true, plan.typography.axisLabel, plan.typography.axisTitle),
+            legend: cartesianLegend,
+            title: titleOptions(plan.titles, plan.typography),
             tooltip: {
                 enabled: true,
                 customizeTooltip: buildCartesianTooltipCustomizer(plan.series),
             },
-            series: plan.series.map(cartesianSeries),
+            series: plan.series.map((s) => cartesianSeries(s, plan.typography.dataLabel)),
         },
     };
 }

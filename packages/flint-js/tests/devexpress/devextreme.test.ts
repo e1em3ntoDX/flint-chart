@@ -242,4 +242,75 @@ describe('planToDevExtreme', () => {
         const { options } = planToDevExtreme(plan);
         expect(options.title).toEqual({ text: 'Quarterly Revenue', subtitle: { text: 'By region, 2026' } });
     });
+
+    it('merges a theme\'s title/subtitle fonts into the title options, alongside the text', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.titles = [
+            { text: 'Quarterly Revenue', role: 'chart' },
+            { text: 'By region, 2026', role: 'subtitle' },
+        ];
+        plan.typography.title = { family: 'Georgia', size: 24, weight: 700, color: '#1a1a1a' };
+        plan.typography.subtitle = { size: 14, color: '#555555' };
+        const { options } = planToDevExtreme(plan);
+        expect(options.title).toEqual({
+            text: 'Quarterly Revenue',
+            font: { family: 'Georgia', size: 24, weight: 700, color: '#1a1a1a' },
+            subtitle: { text: 'By region, 2026', font: { size: 14, color: '#555555' } },
+        });
+    });
+
+    it('still projects a bare title string when there is no subtitle and no title font, exactly as before', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.titles = [{ text: 'Quarterly Revenue', role: 'chart' }];
+        const { options } = planToDevExtreme(plan);
+        expect(options.title).toBe('Quarterly Revenue');
+    });
+
+    it('applies a theme\'s axis label and axis title fonts to both axes identically', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.typography.axisLabel = { size: 13, color: '#333333' };
+        plan.typography.axisTitle = { family: 'Georgia', size: 14, weight: 600 };
+        const { options } = planToDevExtreme(plan);
+        const argumentAxis = options.argumentAxis as Record<string, unknown>;
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        expect((argumentAxis.label as Record<string, unknown>).font).toEqual({ size: 13, color: '#333333' });
+        expect((valueAxis.label as Record<string, unknown>).font).toEqual({ size: 13, color: '#333333' });
+        expect((argumentAxis.title as Record<string, unknown>).font).toEqual({ family: 'Georgia', size: 14, weight: 600 });
+        expect((valueAxis.title as Record<string, unknown>).font).toEqual({ family: 'Georgia', size: 14, weight: 600 });
+    });
+
+    it('applies a theme\'s legend font', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.typography.legend = { size: 13, color: '#222222' };
+        const { options } = planToDevExtreme(plan);
+        expect((options.legend as Record<string, unknown>).font).toEqual({ size: 13, color: '#222222' });
+    });
+
+    it('applies a theme\'s data-label font to every Cartesian series', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.typography.dataLabel = { size: 12, weight: 700 };
+        const { options } = planToDevExtreme(plan);
+        const series = options.series as Array<Record<string, unknown>>;
+        for (const s of series) {
+            expect((s.label as Record<string, unknown>).font).toEqual({ size: 12, weight: 700 });
+        }
+    });
+
+    it('applies a theme\'s data-label font to a Circular chart\'s series', () => {
+        const plan = assembleDevExpressPlan(pieInput);
+        plan.typography.dataLabel = { size: 12, weight: 700 };
+        const { options } = planToDevExtreme(plan);
+        const series = options.series as Array<Record<string, unknown>>;
+        expect((series[0].label as Record<string, unknown>).font).toEqual({ size: 12, weight: 700 });
+    });
+
+    it('leaves every option untouched when plan.typography is entirely empty, exactly as before', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        const { options } = planToDevExtreme(plan);
+        const argumentAxis = options.argumentAxis as Record<string, unknown>;
+        expect(argumentAxis.label).toBeUndefined();
+        expect((options.legend as Record<string, unknown>).font).toBeUndefined();
+        const series = options.series as Array<Record<string, unknown>>;
+        expect((series[0].label as Record<string, unknown>).font).toBeUndefined();
+    });
 });
