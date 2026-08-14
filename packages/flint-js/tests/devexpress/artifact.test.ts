@@ -27,6 +27,7 @@ function validPlan(): DevExpressChartPlan {
         legend: { visible: false, position: 'none' },
         palette: { class: 'categorical', colors: ['#4E79A7'] },
         titles: [],
+        typography: {},
         warnings: [],
         unsupported: [],
     };

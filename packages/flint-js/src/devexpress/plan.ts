@@ -92,6 +92,22 @@ export interface TitlePlan {
     role: 'chart' | 'subtitle';
 }
 
+export interface FontSpec {
+    family?: string;
+    size?: number;
+    weight?: number;
+    color?: string;
+}
+
+export interface TypographyPlan {
+    title?: FontSpec;
+    subtitle?: FontSpec;
+    axisLabel?: FontSpec;
+    axisTitle?: FontSpec;
+    legend?: FontSpec;
+    dataLabel?: FontSpec;
+}
+
 /** A capability the source spec asked for that the plan could not honour verbatim. */
 export interface UnsupportedNote {
     feature: string;
@@ -113,6 +129,7 @@ export interface DevExpressChartPlan {
     legend: { visible: boolean; position: 'right' | 'bottom' | 'none' };
     palette: PalettePlan;
     titles: TitlePlan[];
+    typography: TypographyPlan;
     /** Flint assembler warnings: overflow truncation, colour capping, aggregation. */
     warnings: ChartWarning[];
     unsupported: UnsupportedNote[];
