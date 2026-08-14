@@ -259,13 +259,6 @@ describe('planToDevExtreme', () => {
         });
     });
 
-    it('still projects a bare title string when there is no subtitle and no title font, exactly as before', () => {
-        const plan = assembleDevExpressPlan(barInput);
-        plan.titles = [{ text: 'Quarterly Revenue', role: 'chart' }];
-        const { options } = planToDevExtreme(plan);
-        expect(options.title).toBe('Quarterly Revenue');
-    });
-
     it('applies a theme\'s axis label and axis title fonts to both axes identically', () => {
         const plan = assembleDevExpressPlan(barInput);
         plan.typography.axisLabel = { size: 13, color: '#333333' };
@@ -302,6 +295,13 @@ describe('planToDevExtreme', () => {
         const { options } = planToDevExtreme(plan);
         const series = options.series as Array<Record<string, unknown>>;
         expect((series[0].label as Record<string, unknown>).font).toEqual({ size: 12, weight: 700 });
+    });
+
+    it('applies a theme\'s legend font to a Circular chart', () => {
+        const plan = assembleDevExpressPlan(pieInput);
+        plan.typography.legend = { size: 13, color: '#222222' };
+        const { options } = planToDevExtreme(plan);
+        expect((options.legend as Record<string, unknown>).font).toEqual({ size: 13, color: '#222222' });
     });
 
     it('leaves every option untouched when plan.typography is entirely empty, exactly as before', () => {

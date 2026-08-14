@@ -56,5 +56,5 @@ export function resolveTypeRole(role: TypeRole | undefined): FontSpec | undefine
     if (size !== undefined) font.size = size;
     if (role.weight) font.weight = WEIGHTS[role.weight];
     if (role.color) font.color = role.color;
-    return font;
+    return Object.keys(font).length > 0 ? font : undefined;
 }
