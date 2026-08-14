@@ -10,7 +10,10 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import { z } from 'zod';
 
+import { assembleDevExpressPlan, planToDevExtreme } from 'flint-chart';
+
 import { renderChart, resolveDataSource } from './render/index.js';
+import { prepareInput } from './render/assemble.js';
 import type { RenderBackend } from './render/types.js';
 import { compileChart } from './tools/compile.js';
 import { validateChart } from './tools/validate.js';
@@ -22,6 +25,7 @@ import {
   type SupportedBackend,
   type AssemblyInputArgs,
 } from './tools/schemas.js';
+import { buildDevExpressAssemblyInputShape } from './tools/devexpress-schema.js';
 
 /** Package version, kept in lockstep with the npm release. */
 export const VERSION = JSON.parse(
@@ -131,6 +135,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   // Build the tool input shape once so data.url is documented as disabled when
   // local file references are off (e.g. on a remote/hosted server).
   const assemblyInputShape = buildAssemblyInputShape(options.disableFileReference);
+  const devexpressInputShape = buildDevExpressAssemblyInputShape(options.disableFileReference);
   const backendEnum = z
     .enum(backends as [SupportedBackend, ...SupportedBackend[]])
     .describe(`Rendering backend. One of: ${backends.join(', ')}.`);
@@ -298,6 +303,46 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     async (args: any) => {
       try {
         return jsonResult(listThemes(args?.id as string | undefined));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  // --- create_devexpress_chart ---------------------------------------------
+  server.registerTool(
+    'create_devexpress_chart',
+    {
+      title: 'Create DevExpress chart plan',
+      description:
+        'Compile a Flint chart spec into a DevExpress chart plan (schema ' +
+        '"flint.devexpress.chart/v1") for the DevExtreme web target. Returns ' +
+        '{ plan, projection }: plan is the target-neutral, schema-validated JSON ' +
+        'contract (also consumable by a non-JS renderer); projection is the ' +
+        'ready-to-use dxChart/dxPieChart options object. The DevExpress backend ' +
+        'has no facet grid — column/row encodings are rejected by this tool\'s ' +
+        'own input schema — and chart_spec.chartType is restricted to the chart ' +
+        'types the devextreme target actually supports.',
+      inputSchema: { ...devexpressInputShape },
+    },
+    async (args: any) => {
+      try {
+        // Route through the same prepareInput pipeline every sibling tool
+        // uses (compile_chart, validate_chart, render_chart): resolves
+        // data.url to inline rows, and enforces the shared guards (row-count
+        // DoS cap, canvas-dimension cap, unknown-field/unknown-channel
+        // rejection) before assembleDevExpressPlan ever sees the input.
+        // Passing 'devextreme' lets validateChartSpec check encodings against
+        // the DevExpress template's own channel allowlist, exactly as passing
+        // a RenderBackend does for the vegalite/echarts/chartjs tools.
+        const input = prepareInput(
+          toAssemblyInput(args as AssemblyInputArgs),
+          dataSourceOptions,
+          'devextreme',
+        );
+        const plan = assembleDevExpressPlan(input, { target: 'devextreme' });
+        const projection = planToDevExtreme(plan);
+        return jsonResult({ plan, projection });
       } catch (err) {
         return errorResult(err);
       }

@@ -12,6 +12,7 @@ import {
   vlGetTemplateDef,
   ecGetTemplateDef,
   cjsGetTemplateDef,
+  dxGetTemplateDef,
 } from 'flint-chart';
 import {
   resolveDataSource,
@@ -34,10 +35,21 @@ const ASSEMBLERS: Record<
   chartjs: assembleChartjs,
 };
 
-const TEMPLATE_LOOKUP: Record<RenderBackend, (chartType: string) => ChartTemplateDef | undefined> = {
+/**
+ * Targets `prepareInput`/`validateChartSpec` can validate an encodings object
+ * against. A superset of {@link RenderBackend}: the DevExpress target has no
+ * render pipeline of its own (it produces a `flint.devexpress.chart/v1` plan,
+ * not a backend-native spec), but it still needs the same channel-allowlist
+ * check every render/compile backend gets, so it shares this lookup table
+ * rather than duplicating the check.
+ */
+export type PrepareInputTarget = RenderBackend | 'devextreme';
+
+const TEMPLATE_LOOKUP: Record<PrepareInputTarget, (chartType: string) => ChartTemplateDef | undefined> = {
   vegalite: vlGetTemplateDef,
   echarts: ecGetTemplateDef,
   chartjs: cjsGetTemplateDef,
+  devextreme: (chartType: string) => dxGetTemplateDef(chartType, 'devextreme'),
 };
 
 export interface AssembleResult {
@@ -67,7 +79,7 @@ export function validateInput(
 export function prepareInput(
   input: ChartAssemblyInput,
   options: DataSourceOptions = {},
-  backend?: RenderBackend,
+  backend?: PrepareInputTarget,
 ): ChartAssemblyInput {
   if (input == null || typeof input !== 'object') {
     throw new Error('input must be a ChartAssemblyInput object');
@@ -114,7 +126,7 @@ export function prepareInput(
   return resolvedInput;
 }
 
-function validateChartSpec(cs: any, rows: Record<string, unknown>[], backend?: RenderBackend): void {
+function validateChartSpec(cs: any, rows: Record<string, unknown>[], backend?: PrepareInputTarget): void {
   const encodings = cs.encodings;
   if (encodings == null || typeof encodings !== 'object' || Array.isArray(encodings)) {
     throw new Error('input.chart_spec.encodings must be a channel-to-encoding object');

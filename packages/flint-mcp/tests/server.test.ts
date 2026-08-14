@@ -56,6 +56,7 @@ describe('MCP server', () => {
     expect(names).toEqual([
       'compile_chart',
       'create_chart_view',
+      'create_devexpress_chart',
       'list_chart_types',
       'list_themes',
       'render_chart',
@@ -152,6 +153,147 @@ describe('MCP server', () => {
     expect(payload[0].count).toBeGreaterThan(10);
     expect(payload[0].chartTypes[0]).toHaveProperty('chartType');
     expect(payload[0].chartTypes[0]).toHaveProperty('channels');
+  });
+
+  it('create_devexpress_chart compiles a Bar Chart to a flint.devexpress.chart/v1 plan', async () => {
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: { ...barChart },
+    });
+    expect(res.isError).toBeFalsy();
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.plan.schema).toBe('flint.devexpress.chart/v1');
+    expect(payload.plan.chartType).toBe('Bar Chart');
+    expect(payload.plan.target).toBe('devextreme');
+    expect(payload.plan.family).toBe('Cartesian');
+    expect(payload.projection.component).toBe('dxChart');
+    expect(payload.projection.options).toBeTruthy();
+  });
+
+  it('create_devexpress_chart surfaces a thrown assembler error (missing required channel) with its original message', async () => {
+    // "Candlestick Chart" passes schema validation (it's a valid enum member)
+    // and `x` is one of its real channels (channels: ['x','open','high','low',
+    // 'close']), so this clears the shared prepareInput channel-allowlist
+    // check. But open/high/low/close are missing, so
+    // assembleDevExpressPlan's assertRequiredChannels throws. That thrown
+    // Error must reach the client verbatim via errorResult(), not be
+    // swallowed or replaced. (Deliberately omits `y`, which is not a valid
+    // Candlestick Chart channel and would now be rejected earlier, by
+    // prepareInput's channel-allowlist check, before the assembler runs.)
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          chartType: 'Candlestick Chart',
+          encodings: { x: { field: 'region' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('Candlestick Chart requires channel');
+  });
+
+  it('create_devexpress_chart rejects an unsupported chartType at the schema level, not inside the compiler', async () => {
+    // "Violin Plot" is not in the devextreme chartType enum, so the MCP SDK's
+    // own argument validation rejects the call before the tool handler — and
+    // therefore assembleDevExpressPlan — ever runs. The SDK reports this as a
+    // normal tool result (isError: true) rather than a rejected call.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: { ...barChart.chart_spec, chartType: 'Violin Plot' },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/invalid arguments/i);
+    expect(res.content[0].text).toMatch(/invalid_enum_value/);
+  });
+
+  it('create_devexpress_chart rejects column/row facet encodings at the schema level', async () => {
+    // The encodings schema's own .refine() rejects column/row during argument
+    // validation, before the tool handler runs — i.e. before assertNoFacets()
+    // inside the compiler would.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          ...barChart.chart_spec,
+          encodings: { ...barChart.chart_spec.encodings, column: { field: 'region' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/faceting/i);
+  });
+
+  it('create_devexpress_chart rejects a nonexistent data field via the shared prepareInput pipeline', async () => {
+    // Before the prepareInput fix, this silently produced a plan with
+    // argumentField: "nope" and no warnings — an unrenderable plan created
+    // silently, exactly what the design spec says must never happen.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          ...barChart.chart_spec,
+          encodings: { x: { field: 'nope' }, y: { field: 'revenue' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/field "nope" does not exist in data\.values/);
+  });
+
+  it('create_devexpress_chart rejects an unknown channel via the shared prepareInput pipeline', async () => {
+    // "shape" is not one of Bar Chart's channels (['x','y','color','opacity']).
+    // Before the fix this was silently ignored; now it is caught by the same
+    // channel-allowlist check compile_chart/render_chart/validate_chart get.
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          ...barChart.chart_spec,
+          encodings: { ...barChart.chart_spec.encodings, shape: { field: 'region' } },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/encodings\.shape is not supported by Bar Chart for devextreme/);
+  });
+
+  it('create_devexpress_chart rejects an oversized canvasSize via the shared MAX_CANVAS_DIM guard', async () => {
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        chart_spec: {
+          ...barChart.chart_spec,
+          canvasSize: { width: 999999, height: 999999 },
+        },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/exceeds the maximum dimension/);
+  });
+
+  it('create_devexpress_chart rejects an oversized row count via the shared MAX_DATA_ROWS guard', async () => {
+    const bigValues = Array.from({ length: 150_000 }, (_, i) => ({
+      region: `Region ${i}`,
+      revenue: i,
+    }));
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        ...barChart,
+        data: { values: bigValues },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/exceeding the limit of/);
   });
 
   it('render_chart surfaces assembly errors as isError', async () => {
@@ -291,6 +433,36 @@ describe('MCP server', () => {
       const payload = JSON.parse(res.content[0].text);
       expect(payload.backend).toBe('vegalite');
       expect(payload.spec.data.values).toHaveLength(2);
+    } finally {
+      await dataClient.close();
+      await dataServer.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('create_devexpress_chart reads a local data.url file and inlines its rows', async () => {
+    // Before the prepareInput fix, data.url was advertised in the schema but
+    // never resolved, so a url-only call failed with the misleading error
+    // "DevExpress plan requires at least one data point." Routing through
+    // prepareInput (which calls resolveDataSource) fixes this as a side
+    // effect of the Important #1 fix.
+    const dataDir = mkdtempSync(join(tmpdir(), 'flint-mcp-devexpress-data-'));
+    const dataServer = createServer();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const dataClient = new Client({ name: 'flint-devexpress-data-file-test', version: '0.0.0' });
+    try {
+      const csvPath = join(dataDir, 'sales.csv');
+      writeFileSync(csvPath, 'region,revenue\nNorth,120\nSouth,90\n');
+      await dataServer.connect(serverTransport);
+      await dataClient.connect(clientTransport);
+      const res: any = await dataClient.callTool({
+        name: 'create_devexpress_chart',
+        arguments: { ...barChart, data: { url: csvPath } },
+      });
+      expect(res.isError).toBeFalsy();
+      const payload = JSON.parse(res.content[0].text);
+      expect(payload.plan.schema).toBe('flint.devexpress.chart/v1');
+      expect(payload.plan.data.points).toHaveLength(2);
     } finally {
       await dataClient.close();
       await dataServer.close();

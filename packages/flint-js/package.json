@@ -25,7 +25,9 @@
     "url": "https://github.com/microsoft/flint-chart/issues"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/devexpress/templates/*.ts"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -65,6 +67,11 @@
       "import": "./dist/excel/index.js",
       "require": "./dist/excel/index.cjs"
     },
+    "./devexpress": {
+      "types": "./dist/devexpress/index.d.ts",
+      "import": "./dist/devexpress/index.js",
+      "require": "./dist/devexpress/index.cjs"
+    },
     "./test-data": {
       "types": "./dist/test-data/index.d.ts",
       "import": "./dist/test-data/index.js",
@@ -97,8 +104,8 @@
   },
   "peerDependencies": {
     "chart.js": "^4.0.0",
-    "plotly.js": "^2.0.0 || ^3.0.0",
     "echarts": "^5.0.0 || ^6.0.0",
+    "plotly.js": "^2.0.0 || ^3.0.0",
     "vega": "^5.0.0 || ^6.0.0",
     "vega-lite": "^5.0.0 || ^6.0.0"
   },
@@ -123,6 +130,7 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^8.16.0",
     "@typescript-eslint/parser": "^8.16.0",
+    "ajv": "^8.20.0",
     "eslint": "^9.15.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "prettier": "^3.3.0",
