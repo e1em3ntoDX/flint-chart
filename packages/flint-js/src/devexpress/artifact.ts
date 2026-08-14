@@ -83,6 +83,14 @@ function requireOptionalString(value: unknown, what: string): void {
     }
 }
 
+function requireOptionalNumber(value: unknown, what: string): void {
+    if (value !== undefined && typeof value !== 'number') {
+        throw new Error(
+            `DevExpress plan ${what} must be a number when present (got ${JSON.stringify(value)}).`,
+        );
+    }
+}
+
 function requireEnum<T extends string>(value: unknown, allowed: readonly T[], what: string): void {
     if (typeof value !== 'string' || !(allowed as readonly string[]).includes(value)) {
         throw new Error(
@@ -107,6 +115,25 @@ function validateAxis(value: unknown, what: string): void {
     requireBoolean(axis.reverse, `${what}.reverse`);
     requireOptionalString(axis.title, `${what}.title`);
     requireOptionalString(axis.labelFormat, `${what}.labelFormat`);
+}
+
+function validateFontSpec(value: unknown, what: string): void {
+    const font = requireObject(value, what);
+    requireOptionalString(font.family, `${what}.family`);
+    requireOptionalNumber(font.size, `${what}.size`);
+    requireOptionalNumber(font.weight, `${what}.weight`);
+    requireOptionalString(font.color, `${what}.color`);
+}
+
+const TYPOGRAPHY_KEYS = ['title', 'subtitle', 'axisLabel', 'axisTitle', 'legend', 'dataLabel'] as const;
+
+function validateTypography(value: unknown, what: string): void {
+    const typography = requireObject(value, what);
+    for (const key of TYPOGRAPHY_KEYS) {
+        if (typography[key] !== undefined) {
+            validateFontSpec(typography[key], `${what}.${key}`);
+        }
+    }
 }
 
 /**
@@ -238,6 +265,8 @@ export function prepareDevExpressPlan(value: unknown): DevExpressChartPlan {
         requireText(entry.text, `titles[${index}].text`);
         requireEnum(entry.role, TITLE_ROLES, `titles[${index}].role`);
     }
+
+    validateTypography(plan.typography, 'typography');
 
     if (!Array.isArray(plan.warnings) || !Array.isArray(plan.unsupported)) {
         throw new Error('DevExpress plan requires warnings and unsupported arrays.');

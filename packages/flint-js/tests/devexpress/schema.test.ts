@@ -32,6 +32,7 @@ function validPlan() {
         legend: { visible: false, position: 'none' },
         palette: { class: 'categorical', colors: ['#4E79A7'] },
         titles: [],
+        typography: {},
         warnings: [],
         unsupported: [],
     };
@@ -105,6 +106,13 @@ describe('schema and prepareDevExpressPlan agree', () => {
             (p.series[0] as Record<string, unknown>).valueFormat = { pattern: ',.2f', prefix: '$' };
             return p;
         }],
+        ['a plan carrying resolved typography', () => ({
+            ...validPlan(),
+            typography: {
+                title: { family: 'Georgia', size: 24, weight: 700, color: '#1a1a1a' },
+                axisLabel: { size: 13 },
+            },
+        })],
     ];
 
     const rejected: Array<[string, () => unknown]> = [
@@ -114,6 +122,13 @@ describe('schema and prepareDevExpressPlan agree', () => {
         ['no diagram key at all', () => { const p = validPlan(); delete (p as Record<string, unknown>).diagram; return p; }],
         ['no warnings', () => { const p = validPlan(); delete (p as Record<string, unknown>).warnings; return p; }],
         ['no unsupported', () => { const p = validPlan(); delete (p as Record<string, unknown>).unsupported; return p; }],
+        ['no typography', () => { const p = validPlan(); delete (p as Record<string, unknown>).typography; return p; }],
+        ['a typography font with a non-string family', () => ({
+            ...validPlan(), typography: { title: { family: 42 } },
+        })],
+        ['a typography font with a non-number size', () => ({
+            ...validPlan(), typography: { axisLabel: { size: '14px' } },
+        })],
         ['a numeric chartType', () => ({ ...validPlan(), chartType: 42 })],
         ['an invalid legend position', () => ({ ...validPlan(), legend: { visible: true, position: 'moon' } })],
         ['an invalid palette class', () => ({ ...validPlan(), palette: { class: 'rainbow', colors: [] } })],
