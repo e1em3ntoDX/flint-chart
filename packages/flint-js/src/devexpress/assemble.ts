@@ -18,8 +18,9 @@ import { normalizeStaticSeries } from '../core/static-series';
 import { prepareDevExpressPlan } from './artifact';
 import { pickDevExpressPalette } from './colormap';
 import {
-    DEVEXPRESS_PLAN_SCHEMA, type DevExpressChartPlan, type RenderTarget,
+    DEVEXPRESS_PLAN_SCHEMA, type DevExpressChartPlan, type RenderTarget, type TypographyPlan,
 } from './plan';
+import { resolveTypeRole } from './typography';
 import { resolveDivergingScheme, resolvePaletteClass } from './semantics-bridge';
 import { assertNoFacets, assertRequiredChannels, dxGetTemplateDef, type DxTemplateDef } from './templates';
 
@@ -309,6 +310,24 @@ function themePaletteColors(
     return series.categorical;
 }
 
+/**
+ * Maps a resolved theme's font roles onto the plan's TypographyPlan shape.
+ * Always returns a full TypographyPlan (every key present, possibly
+ * `undefined`) — never `undefined` itself — mirroring `titles`/`warnings`/
+ * `unsupported`'s "always present, possibly empty" convention.
+ */
+function themeTypography(theme: ThemeSpec | undefined): TypographyPlan {
+    const type = theme?.type;
+    return {
+        title: resolveTypeRole(type?.headline),
+        subtitle: resolveTypeRole(type?.deck),
+        axisLabel: resolveTypeRole(type?.axisLabel),
+        axisTitle: resolveTypeRole(type?.axisTitle),
+        legend: resolveTypeRole(type?.keyLabel),
+        dataLabel: resolveTypeRole(type?.valueLabel),
+    };
+}
+
 export function assembleDevExpressPlan(
     input: ChartAssemblyInput,
     options: AssembleDevExpressOptions = {},
@@ -354,6 +373,7 @@ export function assembleDevExpressPlan(
         chartType,
         target,
         titles: buildTitles(input.chart_spec.title, input.chart_spec.subtitle),
+        typography: themeTypography(theme),
         warnings: pipeline.warnings,
         unsupported: [],
     };
@@ -371,9 +391,10 @@ export function assembleDevExpressPlan(
         draft.unsupported!.push({
             feature: 'theme_spec',
             action: 'downgraded',
-            detail: `Theme "${themeName}" requested — only its color palette was applied. Typography, ` +
-                'axis/legend/data-label styling, mark geometry, and furniture are not yet supported by ' +
-                'the DevExpress backend.',
+            detail: `Theme "${themeName}" requested — its color palette and typography (fonts) were ` +
+                'applied. Font style (italic) and text-case transforms cannot be applied. Mark ' +
+                'geometry and furniture (e.g. corner radius, dash styles, chart borders) are not ' +
+                'supported by the DevExpress backend.',
         });
     }
 

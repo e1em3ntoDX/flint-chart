@@ -410,4 +410,53 @@ describe('assembleDevExpressPlan palette', () => {
         const plan = assembleDevExpressPlan(input());
         expect(plan.unsupported.find((u) => u.feature === 'theme_spec')).toBeUndefined();
     });
+
+    it('applies a theme_spec\'s resolved typography to plan.typography', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            theme_spec: 'economist',
+        });
+        // The Economist preset's real type.headline/.deck/.axisLabel — read
+        // verbatim from core/theme/presets/economist.ts at the merged 0.5 tree.
+        expect(plan.typography.title).toEqual({
+            family: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            size: 14,
+            weight: 700,
+        });
+        expect(plan.typography.subtitle).toEqual({ size: 12, color: '#54585a' });
+        expect(plan.typography.axisLabel).toEqual({ size: 10 });
+    });
+
+    it('leaves plan.typography fields undefined for roles a theme never sets', () => {
+        // Economist's real type block only defines headline/deck/axisLabel —
+        // no axisTitle, keyLabel, or valueLabel.
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            theme_spec: 'economist',
+        });
+        expect(plan.typography.axisTitle).toBeUndefined();
+        expect(plan.typography.legend).toBeUndefined();
+        expect(plan.typography.dataLabel).toBeUndefined();
+    });
+
+    it('leaves plan.typography entirely empty when no theme_spec is given, exactly as before', () => {
+        const plan = assembleDevExpressPlan(input());
+        expect(plan.typography).toEqual({
+            title: undefined, subtitle: undefined, axisLabel: undefined,
+            axisTitle: undefined, legend: undefined, dataLabel: undefined,
+        });
+    });
+
+    it('updates the theme_spec downgrade note now that typography is applied', () => {
+        const plan = assembleDevExpressPlan({
+            ...input(),
+            theme_spec: 'economist',
+        });
+        const themeNote = plan.unsupported.find((u) => u.feature === 'theme_spec');
+        expect(themeNote).toBeDefined();
+        expect(themeNote!.detail).toMatch(/palette and typography/i);
+        expect(themeNote!.detail).not.toMatch(/typography.*not yet supported/i);
+        expect(themeNote!.detail).toMatch(/italic/i);
+        expect(themeNote!.detail).toMatch(/mark geometry|furniture/i);
+    });
 });
