@@ -416,25 +416,25 @@ describe('assembleDevExpressPlan palette', () => {
             ...input(),
             theme_spec: 'economist',
         });
-        // The Economist preset's real type.headline/.deck/.axisLabel — read
-        // verbatim from core/theme/presets/economist.ts at the merged 0.5 tree.
+        // The Economist preset's real type.headline/.deck/.axisLabel/.axisTitle —
+        // read verbatim from core/theme/presets/economist.ts at the merged 0.5.1 tree.
         expect(plan.typography.title).toEqual({
             family: "'Helvetica Neue', Helvetica, Arial, sans-serif",
             size: 14,
             weight: 700,
         });
         expect(plan.typography.subtitle).toEqual({ size: 12, color: '#54585a' });
-        expect(plan.typography.axisLabel).toEqual({ size: 10 });
+        expect(plan.typography.axisLabel).toEqual({ size: 11 });
+        expect(plan.typography.axisTitle).toEqual({ size: 11, weight: 400, color: '#54585a' });
     });
 
     it('leaves plan.typography fields undefined for roles a theme never sets', () => {
-        // Economist's real type block only defines headline/deck/axisLabel —
-        // no axisTitle, keyLabel, or valueLabel.
+        // Economist's real type block defines headline/deck/axisLabel/axisTitle —
+        // no keyLabel or valueLabel.
         const plan = assembleDevExpressPlan({
             ...input(),
             theme_spec: 'economist',
         });
-        expect(plan.typography.axisTitle).toBeUndefined();
         expect(plan.typography.legend).toBeUndefined();
         expect(plan.typography.dataLabel).toBeUndefined();
     });
