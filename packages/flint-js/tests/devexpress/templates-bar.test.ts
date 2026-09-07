@@ -310,3 +310,35 @@ describe('axis roles', () => {
         expect(plan.diagram!.rotated).toBe(false);
     });
 });
+
+describe('stackable follows the resolved value channel', () => {
+    // Regression guard for stackedBarChart's `stackable` read: core attaches
+    // `stackable` to whichever channel actually carries the field (confirmed
+    // against resolve-semantics.ts:398-421 — it is derived purely from the
+    // field's own semantic type, independent of which channel it lands on), so
+    // a reversed chart's normalize decision lives on x, not y. Without routing
+    // through resolveAxisRoles().valueAxis, this would silently read undefined
+    // off channelSemantics.y and fall back to the plain StackedBar view type.
+    it('selects FullStackedBar for a reversed Stacked Bar Chart (category on y, measure on x)', () => {
+        const plan = assembleDevExpressPlan({
+            data: {
+                values: [
+                    { quarter: 'Q1', share: 0.6, region: 'North' },
+                    { quarter: 'Q1', share: 0.4, region: 'South' },
+                    { quarter: 'Q2', share: 0.5, region: 'North' },
+                    { quarter: 'Q2', share: 0.5, region: 'South' },
+                ],
+            },
+            // Percentage is the one 'intensive' semantic type resolveStackable
+            // special-cases to 'normalize' (field-semantics.ts:1029-1030).
+            semantic_types: { quarter: 'Quarter', share: 'Percentage', region: 'Country' },
+            chart_spec: {
+                chartType: 'Stacked Bar Chart',
+                encodings: { x: { field: 'share' }, y: { field: 'quarter' }, color: { field: 'region' } },
+            },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.diagram!.argumentAxisChannel).toBe('y');
+        expect(plan.series.every((s) => s.viewType === 'FullStackedBar')).toBe(true);
+    });
+});

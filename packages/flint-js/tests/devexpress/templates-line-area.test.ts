@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dxGetTemplateDef } from '../../src/devexpress/templates';
+import { assembleDevExpressPlan } from '../../src/devexpress/assemble';
 import type { DevExpressChartPlan } from '../../src/devexpress/plan';
 import type { InstantiateContext } from '../../src/core/types';
 
@@ -192,5 +193,37 @@ describe('Range Area Chart template', () => {
             table: [{ month: '2026-01', low: 5, high: 15 }],
         }));
         expect(plan.series![0].name).toBe('Low–High');
+    });
+});
+
+describe('stackable follows the resolved value channel (Area)', () => {
+    // Regression guard for areaViewType's `stackable` read: core attaches
+    // `stackable` to whichever channel actually carries the field (confirmed
+    // against resolve-semantics.ts:398-421 — it is derived purely from the
+    // field's own semantic type, independent of which channel it lands on), so
+    // a reversed chart's normalize decision lives on x, not y. Without routing
+    // through resolveAxisRoles().valueAxis, this would silently read undefined
+    // off channelSemantics.y and fall back to the plain Area view type.
+    it('selects FullStackedArea for a reversed Area Chart (category on y, measure on x)', () => {
+        const plan = assembleDevExpressPlan({
+            data: {
+                values: [
+                    { quarter: 'Q1', share: 0.6, region: 'North' },
+                    { quarter: 'Q1', share: 0.4, region: 'South' },
+                    { quarter: 'Q2', share: 0.5, region: 'North' },
+                    { quarter: 'Q2', share: 0.5, region: 'South' },
+                ],
+            },
+            // Percentage is the one 'intensive' semantic type resolveStackable
+            // special-cases to 'normalize' (field-semantics.ts:1029-1030).
+            semantic_types: { quarter: 'Quarter', share: 'Percentage', region: 'Country' },
+            chart_spec: {
+                chartType: 'Area Chart',
+                encodings: { x: { field: 'share' }, y: { field: 'quarter' }, color: { field: 'region' } },
+            },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.diagram!.argumentAxisChannel).toBe('y');
+        expect(plan.series.every((s) => s.viewType === 'FullStackedArea')).toBe(true);
     });
 });
