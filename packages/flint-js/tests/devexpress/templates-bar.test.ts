@@ -314,6 +314,29 @@ describe('Stacked Bar Chart template', () => {
             { quarter: 'Q2', North: 200, South: 75 },
         ]);
     });
+
+    it('does not split on a continuous color channel', () => {
+        const def = dxGetTemplateDef('Stacked Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Stacked Bar Chart',
+            encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, color: { field: 'temp' } },
+            channelSemantics: {
+                x: { field: 'quarter', type: 'nominal' } as never,
+                y: { field: 'revenue', type: 'quantitative', zero: true, stackable: 'sum' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            table: [
+                { quarter: 'Q1', revenue: 100, temp: 15 },
+                { quarter: 'Q2', revenue: 150, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.series![0].viewType).toBe('StackedBar');
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 describe('axis roles', () => {

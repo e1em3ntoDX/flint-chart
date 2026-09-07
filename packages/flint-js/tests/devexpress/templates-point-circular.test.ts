@@ -77,6 +77,54 @@ describe('Scatter Plot template', () => {
         expect(plan.legend!.visible).toBe(true);
     });
 
+    it('does not split on a continuous color channel', () => {
+        const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, scatterContext({
+            channelSemantics: {
+                x: { field: 'weight', type: 'quantitative' } as never,
+                y: { field: 'mpg', type: 'quantitative' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            encodings: { x: { field: 'weight' }, y: { field: 'mpg' }, color: { field: 'temp' } },
+            table: [
+                { weight: 1.6, mpg: 32, temp: 15 },
+                { weight: 3.4, mpg: 18, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.legend!.visible).toBe(false);
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
+
+    // A Bubble already rejects color for a structural reason (no room for a
+    // second split dimension) regardless of the channel's type, so a
+    // continuous color on a Bubble must not ALSO trip the continuous-color
+    // check — exactly one note for the one rejected channel.
+    it('emits exactly one color note for a Bubble with a continuous color channel', () => {
+        const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, scatterContext({
+            channelSemantics: {
+                x: { field: 'weight', type: 'quantitative' } as never,
+                y: { field: 'mpg', type: 'quantitative' } as never,
+                size: { field: 'hp', type: 'quantitative' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            encodings: {
+                x: { field: 'weight' }, y: { field: 'mpg' }, size: { field: 'hp' }, color: { field: 'temp' },
+            },
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.series![0].viewType).toBe('Bubble');
+        const colorNotes = plan.unsupported!.filter((n) => n.feature === 'color');
+        expect(colorNotes).toHaveLength(1);
+        expect(colorNotes[0].action).toBe('rejected');
+        expect(colorNotes[0].detail).toContain('Bubble series already spends its value fields');
+    });
+
     it('rejects a color channel on a Bubble series out loud instead of dropping it', () => {
         const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
         const plan = draft();
@@ -152,6 +200,29 @@ describe('Connected Scatter Plot template', () => {
         expect(plan.series!.map((s) => s.name).sort()).toEqual(['Asia', 'Europe']);
         expect(plan.series!.every((s) => s.viewType === 'ScatterLine')).toBe(true);
         expect(plan.legend!.visible).toBe(true);
+    });
+
+    it('does not split on a continuous color channel', () => {
+        const def = dxGetTemplateDef('Connected Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Connected Scatter Plot',
+            channelSemantics: {
+                x: { field: 'gdp', type: 'quantitative' } as never,
+                y: { field: 'life', type: 'quantitative' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            encodings: { x: { field: 'gdp' }, y: { field: 'life' }, color: { field: 'temp' } },
+            table: [
+                { gdp: 1, life: 60, temp: 15 },
+                { gdp: 2, life: 70, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.legend!.visible).toBe(false);
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
     });
 });
 

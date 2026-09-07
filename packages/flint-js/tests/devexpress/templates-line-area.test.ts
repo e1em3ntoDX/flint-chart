@@ -62,6 +62,28 @@ describe('Line Chart template', () => {
         expect(plan.legend!.visible).toBe(true);
     });
 
+    it('does not split on a continuous color channel', () => {
+        const def = dxGetTemplateDef('Line Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, color: { field: 'temp' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            table: [
+                { month: '2026-01', sales: 10, temp: 15 },
+                { month: '2026-02', sales: 14, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.legend!.visible).toBe(false);
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
+
     // Regression: colour-split line charts shared one long-format dataSource, so
     // both SKUs' lines traced every row of the table instead of their own.
     it('gives each colour series its own value column over a pivoted table', () => {
@@ -185,6 +207,29 @@ describe('Area Chart template', () => {
             { month: '2026-01', A: 10, B: 20 },
             { month: '2026-02', A: 14, B: 31 },
         ]);
+    });
+
+    it('does not split on a continuous color channel', () => {
+        const def = dxGetTemplateDef('Area Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Area Chart',
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, color: { field: 'temp' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                color: { field: 'temp', type: 'quantitative' } as never,
+            },
+            table: [
+                { month: '2026-01', sales: 10, temp: 15 },
+                { month: '2026-02', sales: 14, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.legend!.visible).toBe(false);
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
     });
 
     it('rejects an opacity channel out loud instead of dropping it', () => {

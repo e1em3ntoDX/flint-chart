@@ -105,6 +105,33 @@ export function applyCartesianFrame(
     plan.unsupported ??= [];
 }
 
+/**
+ * Whether a bound color channel should become one series per category.
+ *
+ * A split turns each distinct value into its own series, so it is only
+ * correct for a discrete channel — nominal or ordinal. On a continuous
+ * (quantitative or temporal) channel, splitting produces one degenerate
+ * series per row and a legend the length of the dataset, where the request
+ * meant a continuous color scale — which dxChart has no per-point
+ * equivalent for on these view types. The channel then carries no color
+ * encoding at all, which is `'rejected'`, not `'downgraded'`: contrast the
+ * theme_spec note (assemble.ts:477-478), which is `'downgraded'` because its
+ * palette did apply, just not its font style or mark geometry.
+ */
+export function resolveColorSplit(plan: Draft, context: InstantiateContext): boolean {
+    if (context.encodings.color == null) return false;
+    const type = context.channelSemantics.color?.type;
+    if (type === 'nominal' || type === 'ordinal') return true;
+    noteUnsupported(plan, {
+        feature: 'color',
+        action: 'rejected',
+        detail: `A ${type ?? 'continuous'} color channel needs a continuous color scale; `
+            + 'dxChart splits series by discrete category only, so the color encoding was '
+            + 'not applied.',
+    });
+    return false;
+}
+
 /** Distinct values of a splitting channel, in Flint's canonical order when available. */
 export function splitValues(context: InstantiateContext, channel: string): string[] {
     const field = fieldOf(context, channel);
@@ -352,7 +379,12 @@ const stackedBarChart: DxTemplateDef = {
         // not off literal y — a reversed chart's stackable flag lives on x.
         const { valueAxis } = resolveAxisRoles(context);
         const normalized = context.channelSemantics[valueAxis]?.stackable === 'normalize';
-        applySplitSeries(spec, context, 'color', normalized ? 'FullStackedBar' : 'StackedBar', true);
+        const viewType = normalized ? 'FullStackedBar' : 'StackedBar';
+        if (resolveColorSplit(spec, context)) {
+            applySplitSeries(spec, context, 'color', viewType, true);
+        } else {
+            spec.series = [{ ...baseSeries(context, viewType), labelsVisible: true }];
+        }
     },
 };
 
