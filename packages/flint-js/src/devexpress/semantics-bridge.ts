@@ -11,14 +11,13 @@
  *
  * Reconciliation notes (see docs/devexpress-core-api-notes.md):
  * - `zero`: `resolveChannelSemantics` never sets it; each backend assembler
- *   calls `computeZeroDecision` itself and merges the plain boolean `zero`
- *   field onto the channel semantics object it already has, before this
- *   reader ever sees it. So in production `sem.zero` is a plain `boolean` —
- *   the `typeof zero === 'boolean'` branch below is the one that actually
- *   fires. The `{ includeZero }`-style object branch is speculative/defensive
- *   only (kept as a fallback in case a future core version wraps the
- *   decision in a descriptor) and is deliberately left in place, unordered
- *   relative to itself, since it was never observed for real.
+ *   calls `computeZeroDecision` itself and merges the result onto the channel
+ *   semantics object it already has, before this reader ever sees it. The real
+ *   shape is the whole `ZeroDecision` descriptor — core declares
+ *   `ChannelSemantics.zero` as `ZeroDecision` (core/types.ts:148) and reads it
+ *   as an object (`zero?.zero`, core/compute-layout.ts:588/592/1753/1757) — so
+ *   the object branch below is the one that fires, on its `'zero'` key. The
+ *   `boolean` branch and the other candidate keys are defensive fallbacks.
  * - `format`: real captures never populate `.format` (only `.tooltipFormat`,
  *   out of scope here), but when a backend sets `.format` its shape is the
  *   real `FormatSpec = { pattern?; prefix?; suffix?; abbreviate? }`
@@ -52,9 +51,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 export function resolveIncludeZero(sem: Loose | undefined): boolean {
     const zero = sem?.zero as unknown;
-    // Real shape (post-assembler merge of computeZeroDecision's result): a
-    // plain boolean. Checked first because this is the branch confirmed to
-    // fire in practice — see reconciliation note above.
+    // A bare boolean is not the real shape (see the reconciliation note above);
+    // it is tolerated only so a hand-built fixture or a differently shaped core
+    // version still reads sensibly.
     if (typeof zero === 'boolean') return zero;
     const record = asRecord(zero);
     if (record) {

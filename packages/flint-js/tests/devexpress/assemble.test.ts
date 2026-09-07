@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { assembleDevExpressPlan } from '../../src/devexpress/assemble';
+import { applyZeroDecisions, assembleDevExpressPlan } from '../../src/devexpress/assemble';
+import { computeChannelBudgets, computeLayout } from '../../src/core/compute-layout';
+import { convertTemporalData, resolveChannelSemantics } from '../../src/core/resolve-semantics';
 import type { ChartAssemblyInput } from '../../src/core/types';
 
 function input(overrides: Partial<ChartAssemblyInput['chart_spec']> = {}): ChartAssemblyInput {
@@ -160,10 +162,11 @@ describe('assembleDevExpressPlan', () => {
         // Range Area Chart is the only template with a y2 channel, and its
         // series name is a hyphenated composite of BOTH y and y2's humanized
         // field names (`${low}–${high}`), built by rangeAreaChart's
-        // instantiate(). Per the plan's own Task 4 design note, this dual-field
-        // name is out of scope for field_display_names (it keys on one real
-        // field, and neither of the two here unambiguously fits) — so an
-        // override naming only the y field must NOT overwrite it.
+        // instantiate(). field_display_names keys on a single real field, so
+        // no entry in it can name that composite: applyFieldDisplayNames
+        // therefore skips the single-series rename whenever a y2 channel is
+        // present (see its `!fieldOfChannel('y2')` guard in assemble.ts), and
+        // an override naming only the y field must NOT overwrite it.
         const plan = assembleDevExpressPlan({
             data: {
                 values: [
@@ -458,5 +461,135 @@ describe('assembleDevExpressPlan palette', () => {
         expect(themeNote!.detail).not.toMatch(/typography.*not yet supported/i);
         expect(themeNote!.detail).toMatch(/italic/i);
         expect(themeNote!.detail).toMatch(/mark geometry|furniture/i);
+    });
+});
+
+describe('zero baseline handed to core', () => {
+    it('stores the full ZeroDecision so core stages can read zero?.zero', () => {
+        const sem: any = {
+            field: 'revenue', type: 'quantitative',
+            semanticAnnotation: { semanticType: 'Price' },
+        };
+        applyZeroDecisions({ y: sem } as never, 'bar', [{ revenue: 100 }, { revenue: 250 }]);
+        // An object, not a bare boolean: core reads zero?.zero, which is
+        // undefined on a boolean, so the whole descriptor must survive.
+        expect(typeof sem.zero).toBe('object');
+        expect(sem.zero.zero).toBe(true);
+        expect(sem.zero.zeroClass).toBe('meaningful');
+    });
+
+    it('feeds core\'s layout stage a baseline it can actually see', () => {
+        // The defect this guards was invisible at the plan level (a DevExpress
+        // plan carries no pixel geometry), so assert against core directly:
+        // compute-layout's banking pass expands the domain to zero only when
+        // `zero?.zero` is truthy (core/compute-layout.ts:588-593, 1753-1758),
+        // then skips banking when zero dominates the resulting domain. Degrade
+        // the descriptor to the bare boolean it used to be and that expansion
+        // silently stops happening, so the two layouts must differ.
+        const data = Array.from({ length: 12 }, (_, i) => ({ t: i, v: 1000 + i * 3 }));
+        const encodings = { x: { field: 't' }, y: { field: 'v' } };
+        const semanticTypes = { t: 'Count', v: 'Amount' };
+        const canvas = { width: 400, height: 320 };
+        const resolve = () => resolveChannelSemantics(
+            encodings as never, data, semanticTypes, convertTemporalData(data, semanticTypes),
+        );
+        const layoutFor = (cs: Record<string, unknown>) => {
+            const budgets = computeChannelBudgets(cs as never, {}, data, canvas, {});
+            return computeLayout(cs as never, {}, data, canvas, {}, budgets.facetGrid);
+        };
+
+        const descriptor: any = resolve();
+        applyZeroDecisions(descriptor, 'line', data);
+        const degraded: any = resolve();
+        applyZeroDecisions(degraded, 'line', data);
+        degraded.y.zero = degraded.y.zero.zero; // the pre-fix bare boolean
+
+        expect(descriptor.y.zero.zero).toBe(true);
+        expect(layoutFor(descriptor)).not.toEqual(layoutFor(degraded));
+    });
+
+    it('honors an explicit includeZero_y override from chartProperties', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [{ region: 'North', revenue: 100 }, { region: 'South', revenue: 250 }] },
+            semantic_types: { region: 'Country', revenue: 'Price' },
+            chart_spec: {
+                chartType: 'Bar Chart',
+                encodings: { x: { field: 'region' }, y: { field: 'revenue' } },
+                chartProperties: { includeZero_y: false },
+            },
+        } as never, { target: 'devextreme' });
+        expect(plan.diagram?.axisY.includeZero).toBe(false);
+    });
+});
+
+describe('PHASE 0 scale-type overrides', () => {
+    /** Two quantitative position channels, so a log scale is legitimate. */
+    function scatterInput(chartProperties?: Record<string, unknown>): ChartAssemblyInput {
+        return {
+            data: {
+                values: [
+                    { revenue: 100, profit: 10 },
+                    { revenue: 5000, profit: 900 },
+                ],
+            },
+            // 'Amount' rather than 'Price' on purpose: resolveScaleType only
+            // considers log for an *additive* open-domain measure
+            // (core/field-semantics.ts:544) and Price is registered
+            // `intensive`, so it can never carry core's log recommendation.
+            semantic_types: { revenue: 'Amount', profit: 'Amount' },
+            chart_spec: {
+                chartType: 'Scatter Plot',
+                encodings: { x: { field: 'revenue' }, y: { field: 'profit' } },
+                chartProperties,
+            },
+        } as ChartAssemblyInput;
+    }
+
+    it('forces a log value axis when logScale_y is true on a position mark', () => {
+        expect(assembleDevExpressPlan(scatterInput()).diagram!.axisY.logarithmic).toBe(false);
+        const plan = assembleDevExpressPlan(scatterInput({ logScale_y: true }));
+        expect(plan.diagram!.axisY.logarithmic).toBe(true);
+    });
+
+    it('forces a linear axis when logScale_y is false, overriding core\'s recommendation', () => {
+        // core/field-semantics.ts:533 only recommends log for an additive,
+        // open-domain measure with >= 10 values spanning >= 6 orders of
+        // magnitude, so the fixture has to clear that bar — otherwise the
+        // `false` override below would be indistinguishable from the default.
+        const spread = { values: Array.from({ length: 10 }, (_, i) => ({ revenue: 10 ** i, profit: 10 ** i })) };
+        const recommended = assembleDevExpressPlan({ ...scatterInput(), data: spread });
+        expect(recommended.diagram!.axisY.logarithmic).toBe(true);
+        const overridden = assembleDevExpressPlan({ ...scatterInput({ logScale_y: false }), data: spread });
+        expect(overridden.diagram!.axisY.logarithmic).toBe(false);
+    });
+
+    it('still strips a forced log scale on a length mark, where the baseline carries the magnitude', () => {
+        // The non-position strip block runs after the override loop precisely
+        // so it keeps the last word: a bar's length is read from zero, and a
+        // log scale destroys that baseline.
+        const plan = assembleDevExpressPlan(input({ chartProperties: { logScale_y: true } }));
+        expect(plan.diagram!.axisY.logarithmic).toBe(false);
+    });
+
+    it('reinterprets a temporal argument axis as discrete bands when xAxisType says so', () => {
+        function dated(chartProperties?: Record<string, unknown>): ChartAssemblyInput {
+            return {
+                data: {
+                    values: [
+                        { date: '2026-01-01', revenue: 100 },
+                        { date: '2026-01-02', revenue: 250 },
+                    ],
+                },
+                semantic_types: { date: 'Date', revenue: 'Price' },
+                chart_spec: {
+                    chartType: 'Line Chart',
+                    encodings: { x: { field: 'date' }, y: { field: 'revenue' } },
+                    chartProperties,
+                },
+            } as ChartAssemblyInput;
+        }
+        expect(assembleDevExpressPlan(dated()).series[0].argumentScaleType).toBe('DateTime');
+        const plan = assembleDevExpressPlan(dated({ xAxisType: 'nominal' }));
+        expect(plan.series[0].argumentScaleType).toBe('Qualitative');
     });
 });

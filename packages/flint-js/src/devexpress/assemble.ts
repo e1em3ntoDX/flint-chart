@@ -40,7 +40,7 @@ const DEFAULT_CANVAS = { width: 400, height: 320 };
  * data-fit) — see core/semantic-types.ts:454-500. DevExpress templates carry no
  * VL mark (`template: {}`), so we map from the one piece of mark cognition they
  * do declare, `ChartTemplateDef.markCognitiveChannel`. A template that ever does
- * declare a VL mark wins, exactly as in vegalite/assemble.ts:224-225.
+ * declare a VL mark wins, exactly as in vegalite/assemble.ts:277-278.
  */
 const MARK_TYPE_BY_COGNITIVE_CHANNEL: Record<MarkCognitiveChannel, string> = {
     length: 'bar',
@@ -52,8 +52,41 @@ const MARK_TYPE_BY_COGNITIVE_CHANNEL: Record<MarkCognitiveChannel, string> = {
 function markTypeOf(def: DxTemplateDef): string {
     const mark = (def.template as { mark?: string | { type?: string } } | undefined)?.mark;
     const declared = typeof mark === 'string' ? mark : mark?.type;
-    // `|| 'point'` mirrors vegalite/assemble.ts:235 (`templateMarkType || 'point'`).
+    // `|| 'point'` mirrors vegalite/assemble.ts:288 (`templateMarkType || 'point'`).
     return declared || MARK_TYPE_BY_COGNITIVE_CHANNEL[def.markCognitiveChannel] || 'point';
+}
+
+/**
+ * Merge core's ZeroDecision onto each quantitative position channel, then apply
+ * the caller's explicit `includeZero_x` / `includeZero_y` overrides — the
+ * PHASE 0 override contract docs/adding-a-backend.md §2 requires, mirroring
+ * vegalite/assemble.ts:287-317.
+ *
+ * Exported so the merged shape can be asserted directly: the whole descriptor
+ * has to survive, because core reads it as an object (`zero?.zero`).
+ */
+export function applyZeroDecisions(
+    channelSemantics: Record<string, ChannelSemantics>,
+    markType: string,
+    data: Record<string, unknown>[],
+    chartProperties?: Record<string, unknown>,
+): void {
+    for (const channel of ['x', 'y'] as const) {
+        const sem = channelSemantics[channel];
+        if (!sem?.field || sem.type !== 'quantitative') continue;
+        const numericValues = data
+            .map((row) => row?.[sem.field])
+            .filter((v: unknown): v is number => typeof v === 'number' && !Number.isNaN(v));
+        sem.zero = computeZeroDecision(
+            sem.semanticAnnotation.semanticType, channel, markType, numericValues,
+        );
+        // An explicit caller override wins, but only over the boolean — the
+        // rest of the descriptor (padding, class) stays core's.
+        const override = chartProperties?.[`includeZero_${channel}`];
+        if (typeof override === 'boolean') {
+            sem.zero = { ...sem.zero, zero: override };
+        }
+    }
 }
 
 interface CoreStageResult {
@@ -108,11 +141,29 @@ function runCoreStages(
     // directly after applyEncodingOverrides.
     data = applyAggregation(encodings, data);
 
+    // Axis dtype override (`xAxisType` / `yAxisType`, docs/adding-a-backend.md
+    // §2 PHASE 0): a date-like field can legitimately read either as a
+    // continuous time scale or as discrete bands, and the host may force the
+    // choice. Written onto the *encoding* rather than the resolved semantics,
+    // because resolveChannelSemantics treats an explicit `encoding.type` as
+    // authoritative (core/resolve-semantics.ts:375) — so the whole of PHASE 0
+    // (format, temporalFormat, ordinalSortOrder, scaleType, zero) is derived
+    // under the forced type instead of being left behind at the old one.
+    // Same placement and the same two accepted values as
+    // vegalite/assemble.ts:223-237, whose control declares exactly
+    // 'temporal' | 'nominal' (vegalite/templates/index.ts:195-211).
+    for (const channel of ['x', 'y'] as const) {
+        const choice = chartProperties?.[`${channel}AxisType`];
+        if ((choice === 'temporal' || choice === 'nominal') && encodings[channel]?.field) {
+            encodings[channel] = { ...encodings[channel], type: choice };
+        }
+    }
+
     // ── PHASE 0: semantics ───────────────────────────────────────────────
     // convertTemporalData (core/resolve-semantics.ts:242) MUST run first: its
     // output is the 4th argument of resolveChannelSemantics
     // (core/resolve-semantics.ts:310), so temporal format detection sees
-    // canonicalized values. Cf. vegalite/assemble.ts:228-232.
+    // canonicalized values. Cf. vegalite/assemble.ts:280-285.
     const convertedData = convertTemporalData(data, semanticTypes);
     const channelSemantics = resolveChannelSemantics(
         encodings, data, semanticTypes, convertedData,
@@ -121,32 +172,44 @@ function runCoreStages(
     // ── PHASE 0b: finalize the zero baseline ─────────────────────────────
     // resolveChannelSemantics deliberately leaves `zero` unset: the decision
     // needs template mark knowledge that only an assembler has (confirmed
-    // empirically — docs/devexpress-core-api-notes.md, "zero is absent"). So, exactly as
-    // vegalite/assemble.ts:234-245 does, we call computeZeroDecision
+    // empirically — docs/devexpress-core-api-notes.md, "zero is absent"). So,
+    // exactly as vegalite/assemble.ts:287-317 does, we call computeZeroDecision
     // (core/semantic-types.ts:454) per quantitative position channel and merge
-    // the result onto the semantics the templates will read.
+    // the WHOLE ZeroDecision onto the semantics the templates will read.
     //
-    // We merge the plain boolean `ZeroDecision.zero` rather than the whole
-    // descriptor: the DevExpress plan's AxisPlan.includeZero is a boolean, and
-    // semantics-bridge's resolveIncludeZero is documented (Task 5) to expect
-    // this merged-boolean shape as the real one. The cast is needed because
-    // core types `ChannelSemantics.zero` as the full ZeroDecision.
+    // The whole descriptor, not just its `zero` boolean: core types
+    // ChannelSemantics.zero as ZeroDecision and reads it as an object
+    // (core/compute-layout.ts:588, 592, 1753, 1757 — all `zero?.zero`). A bare
+    // boolean makes `.zero` undefined, so every core stage below this point
+    // would see "no zero baseline" and domainPadFraction / zeroClass /
+    // uncertain would be lost outright.
     const markType = markTypeOf(def);
+    applyZeroDecisions(channelSemantics, markType, data, chartProperties);
+
+    // Log-scale override (`logScale_x` / `logScale_y`, docs/adding-a-backend.md
+    // §2 PHASE 0): core recommends log conservatively in resolveScaleType
+    // (core/field-semantics.ts:533 — additive open-domain measure, >= 10 values
+    // spanning >= 6 orders of magnitude); this is the host's per-axis on/off
+    // override of that recommendation, mirroring vegalite/assemble.ts:320-348.
+    // `false` clears the recommendation rather than writing 'linear': core only
+    // ever branches on log/symlog (compute-layout.ts:479-480, 1641-1642,
+    // 1901-1902), and `undefined` is the only "no log scale" value the rest of
+    // the pipeline produces. Deliberately placed BEFORE the non-position strip
+    // below, which keeps the last word on length/area marks.
     for (const channel of ['x', 'y'] as const) {
         const sem = channelSemantics[channel];
         if (!sem?.field || sem.type !== 'quantitative') continue;
-        const numericValues = data
-            .map((row) => row?.[sem.field])
-            .filter((v: any) => typeof v === 'number' && !Number.isNaN(v));
-        const decision = computeZeroDecision(
-            sem.semanticAnnotation.semanticType, channel, markType, numericValues,
-        );
-        (sem as unknown as { zero?: boolean }).zero = decision.zero;
+        const logOverride = chartProperties?.[`logScale_${channel}`];
+        if (typeof logOverride !== 'boolean') continue;
+        sem.scaleType = logOverride
+            // log(0) is undefined, so zeros in the data demand symlog.
+            ? (data.some((row) => row?.[sem.field] === 0) ? 'symlog' : 'log')
+            : undefined;
     }
 
     // A log/symlog scale only reads correctly on a continuous *position* mark.
     // On length/area marks the baseline carries the magnitude and log destroys
-    // it, so strip any core-recommended log scale — vegalite/assemble.ts:296-305.
+    // it, so strip any core-recommended log scale — vegalite/assemble.ts:349-358.
     if (def.markCognitiveChannel !== 'position') {
         for (const channel of ['x', 'y'] as const) {
             const sem = channelSemantics[channel];

@@ -24,17 +24,16 @@ describe('resolveIncludeZero', () => {
         expect(resolveIncludeZero({ zero: 'maybe' } as never)).toBe(false);
     });
 
-    // Reconciliation (docs/devexpress-core-api-notes.md): resolveChannelSemantics never
-    // sets `zero` at all — the doc comment says zero-baseline "requires
+    // Reconciliation (docs/devexpress-core-api-notes.md): resolveChannelSemantics
+    // never sets `zero` at all — the doc comment says zero-baseline "requires
     // template mark knowledge that belongs to the assembler." Each backend
-    // assembler calls computeZeroDecision itself (real return shape:
-    // { zero: boolean; domainPadFraction; zeroClass; forced; uncertain }) and
-    // merges the plain boolean `zero` field onto the ChannelSemantics object
-    // it already has, before instantiate() runs. So by the time this reader
-    // sees a real object in production, sem.zero is a plain boolean sitting
-    // alongside a full set of ChannelSemantics fields — not an isolated
-    // `{ zero: true }` fixture and not an `{ includeZero }` descriptor.
-    it('reads the real merged shape: plain boolean zero on a full ChannelSemantics-like object', () => {
+    // assembler calls computeZeroDecision itself and merges its whole return
+    // value onto the ChannelSemantics object it already has, before
+    // instantiate() runs. So the shape this reader actually sees in production
+    // is the full ZeroDecision descriptor sitting alongside a full set of
+    // ChannelSemantics fields — neither an isolated `{ zero: true }` fixture
+    // nor an `{ includeZero }` one.
+    it('reads the real merged shape: a whole ZeroDecision on a full ChannelSemantics-like object', () => {
         const semWithZeroTrue = {
             field: 'revenue',
             semanticAnnotation: { semanticType: 'Price' },
@@ -43,11 +42,18 @@ describe('resolveIncludeZero', () => {
             sortDirection: 'ascending',
             nice: true,
             stackable: false,
-            zero: true, // merged in by the assembler after computeZeroDecision
+            // Exactly what computeZeroDecision returns for a Price y on a bar.
+            zero: {
+                zero: true, domainPadFraction: 0, zeroClass: 'meaningful',
+                forced: true, uncertain: false,
+            },
         };
         expect(resolveIncludeZero(semWithZeroTrue as never)).toBe(true);
 
-        const semWithZeroFalse = { ...semWithZeroTrue, zero: false };
+        const semWithZeroFalse = {
+            ...semWithZeroTrue,
+            zero: { ...semWithZeroTrue.zero, zero: false, forced: false, uncertain: true },
+        };
         expect(resolveIncludeZero(semWithZeroFalse as never)).toBe(false);
     });
 });
