@@ -470,7 +470,11 @@ describe('zero baseline handed to core', () => {
             field: 'revenue', type: 'quantitative',
             semanticAnnotation: { semanticType: 'Price' },
         };
-        applyZeroDecisions({ y: sem } as never, 'bar', [{ revenue: 100 }, { revenue: 250 }]);
+        applyZeroDecisions(
+            { y: sem } as never,
+            { type: 'bar', cognitiveChannel: 'length' },
+            [{ revenue: 100 }, { revenue: 250 }],
+        );
         // An object, not a bare boolean: core reads zero?.zero, which is
         // undefined on a boolean, so the whole descriptor must survive.
         expect(typeof sem.zero).toBe('object');
@@ -482,10 +486,14 @@ describe('zero baseline handed to core', () => {
         // The defect this guards was invisible at the plan level (a DevExpress
         // plan carries no pixel geometry), so assert against core directly:
         // compute-layout's banking pass expands the domain to zero only when
-        // `zero?.zero` is truthy (core/compute-layout.ts:588-593, 1753-1758),
-        // then skips banking when zero dominates the resulting domain. Degrade
-        // the descriptor to the bare boolean it used to be and that expansion
-        // silently stops happening, so the two layouts must differ.
+        // `zero?.zero` is truthy (core/compute-layout.ts:588-593), then skips
+        // banking when zero dominates the resulting domain — coverage below
+        // BANKING_COVERAGE_THRESHOLD (0.2, core/compute-layout.ts:602, applied
+        // at :660-661). Degrade the descriptor to the bare boolean it used to
+        // be and that expansion silently stops happening, so the two layouts
+        // must differ. The fixture's y values sit ~3% of the way up a
+        // zero-anchored domain, well under that 0.2 — if an upstream rebase
+        // retunes the threshold or the guard, this is what to re-check.
         const data = Array.from({ length: 12 }, (_, i) => ({ t: i, v: 1000 + i * 3 }));
         const encodings = { x: { field: 't' }, y: { field: 'v' } };
         const semanticTypes = { t: 'Count', v: 'Amount' };
@@ -498,27 +506,39 @@ describe('zero baseline handed to core', () => {
             return computeLayout(cs as never, {}, data, canvas, {}, budgets.facetGrid);
         };
 
+        const lineMark = { type: 'line', cognitiveChannel: 'position' } as const;
         const descriptor: any = resolve();
-        applyZeroDecisions(descriptor, 'line', data);
+        applyZeroDecisions(descriptor, lineMark, data);
         const degraded: any = resolve();
-        applyZeroDecisions(degraded, 'line', data);
+        applyZeroDecisions(degraded, lineMark, data);
         degraded.y.zero = degraded.y.zero.zero; // the pre-fix bare boolean
 
         expect(descriptor.y.zero.zero).toBe(true);
         expect(layoutFor(descriptor)).not.toEqual(layoutFor(degraded));
     });
 
-    it('honors an explicit includeZero_y override from chartProperties', () => {
-        const plan = assembleDevExpressPlan({
-            data: { values: [{ region: 'North', revenue: 100 }, { region: 'South', revenue: 250 }] },
-            semantic_types: { region: 'Country', revenue: 'Price' },
-            chart_spec: {
-                chartType: 'Bar Chart',
-                encodings: { x: { field: 'region' }, y: { field: 'revenue' } },
-                chartProperties: { includeZero_y: false },
-            },
-        } as never, { target: 'devextreme' });
+    it('honors an explicit includeZero_y override on a position mark', () => {
+        // Same fixture as the Line Chart baseline test above, which pins the
+        // un-overridden answer at `true` — so `false` here can only come from
+        // the override, not from the fixture.
+        const plan = assembleDevExpressPlan(input({
+            chartType: 'Line Chart',
+            chartProperties: { includeZero_y: false },
+        }), { target: 'devextreme' });
         expect(plan.diagram?.axisY.includeZero).toBe(false);
+    });
+
+    it('refuses an includeZero_y override on a length mark, whose baseline is structural', () => {
+        // A bar's height IS its value measured from zero, so switching the
+        // baseline off would leave bars no longer proportional to their data.
+        // core calls that "not debatable" (core/semantic-types.ts:469) and
+        // vegalite/assemble.ts:300-318 gates the same override on a
+        // position-cognitive mark. Bar Chart is `markCognitiveChannel:
+        // 'length'` (templates/bar.ts:261), so the override must be ignored.
+        const plan = assembleDevExpressPlan(input({
+            chartProperties: { includeZero_y: false },
+        }), { target: 'devextreme' });
+        expect(plan.diagram?.axisY.includeZero).toBe(true);
     });
 });
 

@@ -60,14 +60,19 @@ function markTypeOf(def: DxTemplateDef): string {
  * Merge core's ZeroDecision onto each quantitative position channel, then apply
  * the caller's explicit `includeZero_x` / `includeZero_y` overrides — the
  * PHASE 0 override contract docs/adding-a-backend.md §2 requires, mirroring
- * vegalite/assemble.ts:287-317.
+ * vegalite/assemble.ts:287-318.
+ *
+ * `mark` carries both facts the decision needs, together so they cannot drift
+ * apart: `type` is the Vega-Lite mark name computeZeroDecision branches on, and
+ * `cognitiveChannel` is what decides whether the baseline is the reader's
+ * choice at all.
  *
  * Exported so the merged shape can be asserted directly: the whole descriptor
  * has to survive, because core reads it as an object (`zero?.zero`).
  */
 export function applyZeroDecisions(
     channelSemantics: Record<string, ChannelSemantics>,
-    markType: string,
+    mark: { type: string; cognitiveChannel: MarkCognitiveChannel },
     data: Record<string, unknown>[],
     chartProperties?: Record<string, unknown>,
 ): void {
@@ -78,8 +83,17 @@ export function applyZeroDecisions(
             .map((row) => row?.[sem.field])
             .filter((v: unknown): v is number => typeof v === 'number' && !Number.isNaN(v));
         sem.zero = computeZeroDecision(
-            sem.semanticAnnotation.semanticType, channel, markType, numericValues,
+            sem.semanticAnnotation.semanticType, channel, mark.type, numericValues,
         );
+        // The baseline is only the reader's to choose on a position-cognitive
+        // mark, so the override is gated exactly as vegalite/assemble.ts:300-318
+        // gates it. On a length/area mark the baseline is structural, not a
+        // preference — a bar's height IS its value measured from zero, and core
+        // states the reason outright at core/semantic-types.ts:469 ("a bar's
+        // length is meaningless without zero. Not debatable.") by returning
+        // forced: true there. Honouring the override on such a mark would leave
+        // bars whose heights are no longer proportional to their values.
+        if (mark.cognitiveChannel !== 'position') continue;
         // An explicit caller override wins, but only over the boolean — the
         // rest of the descriptor (padding, class) stays core's.
         const override = chartProperties?.[`includeZero_${channel}`];
@@ -179,12 +193,19 @@ function runCoreStages(
     //
     // The whole descriptor, not just its `zero` boolean: core types
     // ChannelSemantics.zero as ZeroDecision and reads it as an object
-    // (core/compute-layout.ts:588, 592, 1753, 1757 — all `zero?.zero`). A bare
-    // boolean makes `.zero` undefined, so every core stage below this point
-    // would see "no zero baseline" and domainPadFraction / zeroClass /
-    // uncertain would be lost outright.
+    // (`zero?.zero`). A bare boolean makes `.zero` undefined, and
+    // domainPadFraction / zeroClass / uncertain are lost outright. The reader
+    // that matters here is computeLayout (core/compute-layout.ts:588, 592) —
+    // computeChannelBudgets and filterOverflow never look at `zero`, and core's
+    // other pair of reads sits in computeFacetGrid (:1753, 1757), which this
+    // backend never reaches because faceting is rejected upfront.
     const markType = markTypeOf(def);
-    applyZeroDecisions(channelSemantics, markType, data, chartProperties);
+    applyZeroDecisions(
+        channelSemantics,
+        { type: markType, cognitiveChannel: def.markCognitiveChannel },
+        data,
+        chartProperties,
+    );
 
     // Log-scale override (`logScale_x` / `logScale_y`, docs/adding-a-backend.md
     // §2 PHASE 0): core recommends log conservatively in resolveScaleType
