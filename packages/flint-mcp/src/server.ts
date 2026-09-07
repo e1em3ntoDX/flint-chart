@@ -350,8 +350,9 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         // of which stringify drops silently, leaving point labels switched on but
         // unformatted. The plan is the contract; planToDevExtreme is the client's
         // call, on the client, where the callbacks survive. Same reason
-        // tests/devexpress/devextreme.test.ts:195 moved its round-trip assertions
-        // client-side. It also stops each response from printing the dataset twice.
+        // tests/devexpress/devextreme.test.ts:224-228 moved its round-trip
+        // assertions client-side. It also stops each response from printing the
+        // dataset twice.
         return jsonResult({ plan });
       } catch (err) {
         return errorResult(err);

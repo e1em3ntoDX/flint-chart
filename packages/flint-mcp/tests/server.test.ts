@@ -33,6 +33,23 @@ function resourceText(content: { uri: string; text?: string; blob?: string }): s
   throw new Error(`expected text content for ${content.uri}`);
 }
 
+// Recursively counts plain (non-array) objects anywhere in `value` for which
+// `matches` returns true. Used to confirm a given data row appears exactly
+// once in a parsed MCP response, rather than once in `plan.data.points` and
+// again in a duplicate `projection.options.dataSource`.
+function countMatchingObjects(
+  value: unknown,
+  matches: (obj: Record<string, unknown>) => boolean,
+): number {
+  if (value === null || typeof value !== 'object') return 0;
+  let count = 0;
+  if (!Array.isArray(value) && matches(value as Record<string, unknown>)) count += 1;
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    count += countMatchingObjects(child, matches);
+  }
+  return count;
+}
+
 let client: Client;
 let server: McpServer;
 
@@ -181,8 +198,12 @@ describe('MCP server', () => {
     const payload = JSON.parse(res.content[0].text);
     expect(payload.plan).toBeDefined();
     expect(payload.projection).toBeUndefined();
-    // The dataset appears exactly once in the response.
-    expect(res.content[0].text.split('"Q1"').length - 1).toBe(1);
+    // The { q: 'Q1', v: 1 } row appears exactly once in the parsed response.
+    // If a projection re-appeared, its options.dataSource would duplicate
+    // plan.data.points and this count would climb to 2.
+    const isQ1Row = (obj: Record<string, unknown>) =>
+      Object.keys(obj).length === 2 && obj.q === 'Q1' && obj.v === 1;
+    expect(countMatchingObjects(payload, isQ1Row)).toBe(1);
   });
 
   it('create_devexpress_chart surfaces a thrown assembler error (missing required channel) with its original message', async () => {
