@@ -4,7 +4,7 @@
 
 import type { ChannelSemantics, ChartWarning, InstantiateContext } from '../../core/types';
 import { detectBandedAxisFromSemantics } from '../../core/axis-detection';
-import type { AxisPlan, DevExpressChartPlan, SeriesPlan } from '../plan';
+import type { AxisPlan, DevExpressChartPlan, SeriesPlan, UnsupportedNote } from '../plan';
 import {
     resolveArgumentScaleType, resolveIncludeZero, resolveLabelFormat,
     resolveLogarithmic, resolveReverse, resolveTooltipFormat, resolveValueScaleType,
@@ -15,6 +15,11 @@ type Draft = Partial<DevExpressChartPlan>;
 
 export function fieldOf(context: InstantiateContext, channel: string): string | undefined {
     return context.channelSemantics[channel]?.field ?? context.encodings[channel]?.field;
+}
+
+/** Append an UnsupportedNote, keeping the array-init contract the frame sets up. */
+export function noteUnsupported(plan: Draft, note: UnsupportedNote): void {
+    plan.unsupported = [...(plan.unsupported ?? []), note];
 }
 
 /**
@@ -294,6 +299,14 @@ const barChart: DxTemplateDef = {
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: false });
         spec.series = [{ ...baseSeries(context, 'Bar'), labelsVisible: true }];
+        if (context.encodings.opacity != null) {
+            noteUnsupported(spec, {
+                feature: 'opacity',
+                action: 'rejected',
+                detail: 'dxChart has no data-driven per-point opacity channel; '
+                    + 'the encoding was ignored.',
+            });
+        }
     },
 };
 

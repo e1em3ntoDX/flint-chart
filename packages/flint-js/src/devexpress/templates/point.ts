@@ -5,7 +5,9 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import { binHistogram } from '../transforms';
-import { applyCartesianFrame, baseSeries, fieldOf, resolveAxisRoles } from './bar';
+import {
+    applyCartesianFrame, applySplitSeries, baseSeries, fieldOf, noteUnsupported, resolveAxisRoles,
+} from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -19,12 +21,41 @@ const scatterPlot: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
-        applyCartesianFrame(spec, context, { rotated: false, legend: false });
+        const hasColor = context.encodings.color != null;
+        applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const sizeField = fieldOf(context, 'size');
-        const series: SeriesPlan = sizeField
-            ? { ...baseSeries(context, 'Bubble'), valueFields: [fieldOf(context, resolveAxisRoles(context).valueAxis)!, sizeField] }
-            : { ...baseSeries(context, 'Point'), markerKind: 'Circle' };
-        spec.series = [series];
+        if (sizeField) {
+            // Bubble encodes the third measure in the marker area, so a color
+            // split would need a series per category *and* per bubble size —
+            // dxChart has no such shape. Report rather than drop.
+            const { valueAxis } = resolveAxisRoles(context);
+            const series: SeriesPlan = {
+                ...baseSeries(context, 'Bubble'),
+                valueFields: [fieldOf(context, valueAxis)!, sizeField],
+            };
+            spec.series = [series];
+            if (hasColor) {
+                noteUnsupported(spec, {
+                    feature: 'color',
+                    action: 'rejected',
+                    detail: 'A Bubble series already spends its value fields on the size measure; '
+                        + 'dxChart cannot also split it by category.',
+                });
+            }
+        } else if (hasColor) {
+            applySplitSeries(spec, context, 'color', 'Point', false);
+            for (const series of spec.series ?? []) series.markerKind = 'Circle';
+        } else {
+            spec.series = [{ ...baseSeries(context, 'Point'), markerKind: 'Circle' }];
+        }
+        if (context.encodings.opacity != null) {
+            noteUnsupported(spec, {
+                feature: 'opacity',
+                action: 'rejected',
+                detail: 'dxChart has no data-driven per-point opacity channel; '
+                    + 'the encoding was ignored.',
+            });
+        }
     },
 };
 
@@ -37,8 +68,13 @@ const connectedScatterPlot: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
-        applyCartesianFrame(spec, context, { rotated: false, legend: false });
-        spec.series = [baseSeries(context, 'ScatterLine')];
+        const hasColor = context.encodings.color != null;
+        applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
+        if (hasColor) {
+            applySplitSeries(spec, context, 'color', 'ScatterLine', false);
+        } else {
+            spec.series = [baseSeries(context, 'ScatterLine')];
+        }
     },
 };
 

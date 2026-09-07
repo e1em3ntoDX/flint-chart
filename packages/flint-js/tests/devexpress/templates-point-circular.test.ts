@@ -55,6 +55,64 @@ describe('Scatter Plot template', () => {
         expect(plan.series![0].viewType).toBe('Bubble');
         expect(plan.series![0].valueFields).toEqual(['mpg', 'hp']);
     });
+
+    it('splits by a nominal color channel into one series per category with a visible legend', () => {
+        const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, scatterContext({
+            channelSemantics: {
+                x: { field: 'weight', type: 'quantitative' } as never,
+                y: { field: 'mpg', type: 'quantitative' } as never,
+                color: { field: 'origin', type: 'nominal' } as never,
+            },
+            encodings: { x: { field: 'weight' }, y: { field: 'mpg' }, color: { field: 'origin' } },
+            table: [
+                { weight: 1.6, mpg: 32, origin: 'JP' },
+                { weight: 3.4, mpg: 18, origin: 'US' },
+                { weight: 2.1, mpg: 27, origin: 'EU' },
+            ],
+        }));
+        expect(plan.series!.map((s) => s.name).sort()).toEqual(['EU', 'JP', 'US']);
+        expect(plan.series!.every((s) => s.viewType === 'Point' && s.markerKind === 'Circle')).toBe(true);
+        expect(plan.legend!.visible).toBe(true);
+    });
+
+    it('rejects a color channel on a Bubble series out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, scatterContext({
+            channelSemantics: {
+                x: { field: 'weight', type: 'quantitative' } as never,
+                y: { field: 'mpg', type: 'quantitative' } as never,
+                size: { field: 'hp', type: 'quantitative' } as never,
+                color: { field: 'origin', type: 'nominal' } as never,
+            },
+            encodings: {
+                x: { field: 'weight' }, y: { field: 'mpg' }, size: { field: 'hp' }, color: { field: 'origin' },
+            },
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.series![0].viewType).toBe('Bubble');
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
+
+    it('rejects an opacity channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, scatterContext({
+            channelSemantics: {
+                x: { field: 'weight', type: 'quantitative' } as never,
+                y: { field: 'mpg', type: 'quantitative' } as never,
+                opacity: { field: 'hp', type: 'quantitative' } as never,
+            },
+            encodings: { x: { field: 'weight' }, y: { field: 'mpg' }, opacity: { field: 'hp' } },
+        }));
+        const note = plan.unsupported!.find((n) => n.feature === 'opacity');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 describe('Connected Scatter Plot template', () => {
@@ -71,6 +129,27 @@ describe('Connected Scatter Plot template', () => {
             table: [{ gdp: 1, life: 60 }],
         }));
         expect(plan.series![0].viewType).toBe('ScatterLine');
+    });
+
+    it('splits by a nominal color channel into one series per category with a visible legend', () => {
+        const def = dxGetTemplateDef('Connected Scatter Plot', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Connected Scatter Plot',
+            channelSemantics: {
+                x: { field: 'gdp', type: 'quantitative' } as never,
+                y: { field: 'life', type: 'quantitative' } as never,
+                color: { field: 'continent', type: 'nominal' } as never,
+            },
+            encodings: { x: { field: 'gdp' }, y: { field: 'life' }, color: { field: 'continent' } },
+            table: [
+                { gdp: 1, life: 60, continent: 'Asia' },
+                { gdp: 2, life: 70, continent: 'Europe' },
+            ],
+        }));
+        expect(plan.series!.map((s) => s.name).sort()).toEqual(['Asia', 'Europe']);
+        expect(plan.series!.every((s) => s.viewType === 'ScatterLine')).toBe(true);
+        expect(plan.legend!.visible).toBe(true);
     });
 });
 

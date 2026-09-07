@@ -86,6 +86,22 @@ describe('Bar Chart template', () => {
         expect(plan.diagram!.axisY.title).toBe('Units Sold');
         expect(plan.series![0].name).toBe('Units Sold');
     });
+
+    it('rejects an opacity channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, opacity: { field: 'revenue' } },
+            channelSemantics: {
+                x: { field: 'quarter', type: 'nominal' } as never,
+                y: { field: 'revenue', type: 'quantitative', zero: true } as never,
+                opacity: { field: 'revenue', type: 'quantitative' } as never,
+            },
+        }));
+        const note = plan.unsupported!.find((n) => n.feature === 'opacity');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 /** Long-format rows: North(Q1=100, Q2=150) / South(Q1=200) — South has no Q2. */
