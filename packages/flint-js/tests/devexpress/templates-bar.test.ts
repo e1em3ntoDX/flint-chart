@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dxGetTemplateDef } from '../../src/devexpress/templates';
+import { assembleDevExpressPlan } from '../../src/devexpress/assemble';
 import type { DevExpressChartPlan } from '../../src/devexpress/plan';
 import type { InstantiateContext } from '../../src/core/types';
 
@@ -273,5 +274,39 @@ describe('Stacked Bar Chart template', () => {
             { quarter: 'Q1', North: 100, South: 50 },
             { quarter: 'Q2', North: 200, South: 75 },
         ]);
+    });
+});
+
+describe('axis roles', () => {
+    it('puts the category on the argument axis when the measure is on x', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [{ region: 'North', revenue: 100 }, { region: 'South', revenue: 250 }] },
+            semantic_types: { region: 'Country', revenue: 'Price' },
+            chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'revenue' }, y: { field: 'region' } } },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.series[0].argumentField).toBe('region');
+        expect(plan.series[0].valueFields).toEqual(['revenue']);
+        expect(plan.series[0].argumentScaleType).toBe('Qualitative');
+        expect(plan.series[0].valueScaleType).toBe('Numerical');
+        // The measure axis is the one that gets a zero baseline and gridlines.
+        expect(plan.diagram!.axisX.includeZero).toBe(true);
+        expect(plan.diagram!.axisX.gridLines).toBe(true);
+        expect(plan.diagram!.axisY.gridLines).toBe(false);
+        // Category down the side means the diagram renders rotated.
+        expect(plan.diagram!.rotated).toBe(true);
+    });
+
+    it('leaves the conventional x=category orientation alone', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [{ region: 'North', revenue: 100 }, { region: 'South', revenue: 250 }] },
+            semantic_types: { region: 'Country', revenue: 'Price' },
+            chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'region' }, y: { field: 'revenue' } } },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.series[0].argumentField).toBe('region');
+        expect(plan.series[0].valueFields).toEqual(['revenue']);
+        expect(plan.diagram!.axisY.includeZero).toBe(true);
+        expect(plan.diagram!.rotated).toBe(false);
     });
 });

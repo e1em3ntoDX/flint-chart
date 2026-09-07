@@ -5,7 +5,7 @@
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import { binHistogram } from '../transforms';
-import { applyCartesianFrame, baseSeries, fieldOf } from './bar';
+import { applyCartesianFrame, baseSeries, fieldOf, resolveAxisRoles } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -22,7 +22,7 @@ const scatterPlot: DxTemplateDef = {
         applyCartesianFrame(spec, context, { rotated: false, legend: false });
         const sizeField = fieldOf(context, 'size');
         const series: SeriesPlan = sizeField
-            ? { ...baseSeries(context, 'Bubble'), valueFields: [fieldOf(context, 'y')!, sizeField] }
+            ? { ...baseSeries(context, 'Bubble'), valueFields: [fieldOf(context, resolveAxisRoles(context).valueAxis)!, sizeField] }
             : { ...baseSeries(context, 'Point'), markerKind: 'Circle' };
         spec.series = [series];
     },

@@ -2,7 +2,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import type { ChartWarning, InstantiateContext } from '../../core/types';
+import type { ChannelSemantics, ChartWarning, InstantiateContext } from '../../core/types';
+import { detectBandedAxisFromSemantics } from '../../core/axis-detection';
 import type { AxisPlan, DevExpressChartPlan, SeriesPlan } from '../plan';
 import {
     resolveArgumentScaleType, resolveIncludeZero, resolveLabelFormat,
@@ -34,6 +35,28 @@ export function humanizeFieldName(field: string | undefined): string | undefined
     return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+/**
+ * Which position channel carries the categories and which carries the measure.
+ *
+ * Never assume x=argument / y=value: a spec may legitimately put the measure on
+ * x and the category on y, and a series built the other way round declares a
+ * string column Numerical, which renders an empty chart. The decision itself is
+ * core's — detectBandedAxisFromSemantics (core/axis-detection.ts:35) returns the
+ * banded (category) axis, handling the discrete cases and the
+ * quantitative/temporal tiebreaks — so we read it rather than re-deriving it.
+ */
+export function resolveAxisRoles(
+    context: InstantiateContext,
+): { categoryAxis: 'x' | 'y'; valueAxis: 'x' | 'y' } {
+    const banded = detectBandedAxisFromSemantics(
+        context.channelSemantics as Record<string, ChannelSemantics>,
+        context.table,
+        { preferAxis: 'x' },
+    );
+    const categoryAxis = banded?.axis ?? 'x';
+    return { categoryAxis, valueAxis: categoryAxis === 'x' ? 'y' : 'x' };
+}
+
 function axis(context: InstantiateContext, channel: string, applyZero: boolean): AxisPlan {
     const sem = context.channelSemantics[channel];
     return {
@@ -56,10 +79,14 @@ export function applyCartesianFrame(
     plan.chartType = context.chartType;
     plan.dataMode = 'materialized';
     plan.data = { points: context.table };
+    const { categoryAxis, valueAxis } = resolveAxisRoles(context);
     plan.diagram = {
-        rotated: options.rotated,
-        axisX: axis(context, 'x', false),
-        axisY: axis(context, 'y', true),
+        // dxChart renders the argument axis vertically when rotated, which is
+        // what a category on y means. An explicit orient:'horizontal' asks for
+        // the same thing, so either is sufficient.
+        rotated: options.rotated || categoryAxis === 'y',
+        axisX: axis(context, 'x', valueAxis === 'x'),
+        axisY: axis(context, 'y', valueAxis === 'y'),
     };
     plan.legend = options.legend
         ? { visible: true, position: 'right' }
@@ -92,17 +119,18 @@ function isHorizontal(context: InstantiateContext): boolean {
 }
 
 export function baseSeries(context: InstantiateContext, viewType: string): SeriesPlan {
-    const argumentField = fieldOf(context, 'x')!;
-    const valueField = fieldOf(context, 'y')!;
+    const { categoryAxis, valueAxis } = resolveAxisRoles(context);
+    const argumentField = fieldOf(context, categoryAxis)!;
+    const valueField = fieldOf(context, valueAxis)!;
     return {
         name: humanizeFieldName(valueField)!,
         viewType,
         argumentField,
         valueFields: [valueField],
-        argumentScaleType: resolveArgumentScaleType(context.channelSemantics.x),
-        valueScaleType: resolveValueScaleType(context.channelSemantics.y),
+        argumentScaleType: resolveArgumentScaleType(context.channelSemantics[categoryAxis]),
+        valueScaleType: resolveValueScaleType(context.channelSemantics[valueAxis]),
         labelsVisible: false,
-        valueFormat: resolveTooltipFormat(context.channelSemantics.y),
+        valueFormat: resolveTooltipFormat(context.channelSemantics[valueAxis]),
     };
 }
 
