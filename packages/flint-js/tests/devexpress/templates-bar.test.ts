@@ -242,6 +242,31 @@ describe('Grouped Bar Chart template', () => {
         expect(plan.legend!.visible).toBe(false);
     });
 
+    it('does not split on a continuous group channel', () => {
+        const def = dxGetTemplateDef('Grouped Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Grouped Bar Chart',
+            encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, group: { field: 'temp' } },
+            channelSemantics: {
+                x: { field: 'quarter', type: 'nominal' } as never,
+                y: { field: 'revenue', type: 'quantitative', zero: true } as never,
+                group: { field: 'temp', type: 'quantitative' } as never,
+            },
+            table: [
+                { quarter: 'Q1', revenue: 100, temp: 15 },
+                { quarter: 'Q2', revenue: 150, temp: 16 },
+            ],
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.series![0].viewType).toBe('Bar');
+        const note = plan.unsupported!.find((n) => n.feature === 'group');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+        // No split happened, so there is nothing for a legend to label.
+        expect(plan.legend!.visible).toBe(false);
+    });
+
     it('does not humanize category values used as split-series names', () => {
         const def = dxGetTemplateDef('Grouped Bar Chart', 'devextreme')!;
         const plan = draft();

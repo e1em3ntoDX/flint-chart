@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
-import { applyCartesianFrame, applySplitSeries, baseSeries, noteUnsupported, resolveColorSplit } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries, noteUnsupported, resolveSplitChannel } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -34,7 +34,7 @@ const lineChart: DxTemplateDef = {
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
         // Line charts are never rotated: Flint omits the transpose operator for them.
-        const hasColor = resolveColorSplit(spec, context);
+        const hasColor = resolveSplitChannel(spec, context, 'color');
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = lineViewType(context);
         if (hasColor) {

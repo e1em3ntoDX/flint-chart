@@ -106,28 +106,42 @@ export function applyCartesianFrame(
 }
 
 /**
- * Whether a bound color channel should become one series per category.
+ * Whether a bound splitting channel (`'color'` or `'group'`) should become
+ * one series per category.
  *
- * A split turns each distinct value into its own series, so it is only
- * correct for a discrete channel — nominal or ordinal. On a continuous
- * (quantitative or temporal) channel, splitting produces one degenerate
- * series per row and a legend the length of the dataset, where the request
- * meant a continuous color scale — which dxChart has no per-point
- * equivalent for on these view types. The channel then carries no color
- * encoding at all, which is `'rejected'`, not `'downgraded'`: contrast the
- * theme_spec note (assemble.ts:477-478), which is `'downgraded'` because its
- * palette did apply, just not its font style or mark geometry.
+ * `group` resolves a type the same way `color` does — `ChannelSemantics.type`
+ * (core/types.ts:126) is generic across channels, and `group` is a
+ * first-class `ColorChannel` (core/color-decisions.ts:29,74) that gets the
+ * same sequential/diverging (continuous) scheme types `color` does — so this
+ * is one rule for both, not a color-specific one. A split turns each
+ * distinct value into its own series, so it is only correct for a discrete
+ * channel — nominal or ordinal. On a continuous (quantitative or temporal)
+ * channel, splitting produces one degenerate series per row and a legend the
+ * length of the dataset, where the request meant a continuous scale — which
+ * dxChart has no per-point equivalent for on these view types. The channel
+ * then carries no split encoding at all, which is `'rejected'`, not
+ * `'downgraded'`: contrast the theme_spec note (assemble.ts:477-478), which
+ * is `'downgraded'` because its palette did apply, just not its font style
+ * or mark geometry.
+ *
+ * Presence is read via `fieldOf` (channelSemantics first, encodings
+ * fallback) rather than raw `context.encodings[channel]`, so this gate can
+ * never disagree with `splitSeries`'s own `!splitField` decline path
+ * (splitSeries, below) about whether a channel is actually bound.
+ *
+ * Side-effecting: on decline this appends an `UnsupportedNote` via
+ * `noteUnsupported`. Call at most once per `instantiate` per channel — a
+ * second call for the same channel would duplicate the note.
  */
-export function resolveColorSplit(plan: Draft, context: InstantiateContext): boolean {
-    if (context.encodings.color == null) return false;
-    const type = context.channelSemantics.color?.type;
+export function resolveSplitChannel(plan: Draft, context: InstantiateContext, channel: string): boolean {
+    if (!fieldOf(context, channel)) return false;
+    const type = context.channelSemantics[channel]?.type;
     if (type === 'nominal' || type === 'ordinal') return true;
     noteUnsupported(plan, {
-        feature: 'color',
+        feature: channel,
         action: 'rejected',
-        detail: `A ${type ?? 'continuous'} color channel needs a continuous color scale; `
-            + 'dxChart splits series by discrete category only, so the color encoding was '
-            + 'not applied.',
+        detail: `A ${type ?? 'continuous'} ${channel} channel is not discrete; dxChart splits `
+            + `series by category only, so the ${channel} encoding was not applied.`,
     });
     return false;
 }
@@ -359,14 +373,18 @@ const groupedBarChart: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
-        // Unlike color, 'group' has no continuous/discrete distinction to
-        // resolve — it only ever declines by being absent (confirmed by the
-        // existing "falls back to a single series when no group channel is
-        // bound" test, where splitSeries's own `!splitField` fallback kicks
-        // in). So the legend just follows whether the channel was bound.
-        const hasGroup = context.encodings.group != null;
-        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: hasGroup });
-        applySplitSeries(spec, context, 'group', 'Bar', true);
+        // 'group' resolves a type the same way 'color' does (see
+        // resolveSplitChannel's doc comment) — a continuous field bound here
+        // hits the exact same one-series-per-row bug as a continuous color,
+        // so it goes through the same gate, computed once and reused for
+        // both the legend and the split/no-split branch.
+        const splitsByGroup = resolveSplitChannel(spec, context, 'group');
+        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: splitsByGroup });
+        if (splitsByGroup) {
+            applySplitSeries(spec, context, 'group', 'Bar', true);
+        } else {
+            spec.series = [{ ...baseSeries(context, 'Bar'), labelsVisible: true }];
+        }
     },
 };
 
@@ -382,10 +400,10 @@ const stackedBarChart: DxTemplateDef = {
         // Computed once, before the frame: the legend must follow whether a
         // split actually happened, not merely whether `color` was bound —
         // otherwise a continuous color (declined below) would still turn the
-        // legend on to label a single series. Calling resolveColorSplit here
-        // and reusing the result (rather than calling it again inside the
-        // branch) also keeps the rejection note from firing twice.
-        const splitsByColor = resolveColorSplit(spec, context);
+        // legend on to label a single series. Calling resolveSplitChannel
+        // here and reusing the result (rather than calling it again inside
+        // the branch) also keeps the rejection note from firing twice.
+        const splitsByColor = resolveSplitChannel(spec, context, 'color');
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: splitsByColor });
         // stackable is core's decision about the MEASURE channel, so it has to
         // be read off whichever channel resolveAxisRoles found the value on,

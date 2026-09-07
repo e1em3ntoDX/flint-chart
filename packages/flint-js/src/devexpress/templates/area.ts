@@ -6,7 +6,7 @@ import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import {
     applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName, noteUnsupported, resolveAxisRoles,
-    resolveColorSplit,
+    resolveSplitChannel,
 } from './bar';
 import { resolveArgumentScaleType, resolveTooltipFormat, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
@@ -36,7 +36,7 @@ const areaChart: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'area',
     instantiate(spec: Draft, context: InstantiateContext) {
-        const hasColor = resolveColorSplit(spec, context);
+        const hasColor = resolveSplitChannel(spec, context, 'color');
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = areaViewType(context);
         if (hasColor) {

@@ -7,7 +7,7 @@ import type { DevExpressChartPlan, SeriesPlan } from '../plan';
 import { binHistogram } from '../transforms';
 import {
     applyCartesianFrame, applySplitSeries, baseSeries, fieldOf, noteUnsupported, resolveAxisRoles,
-    resolveColorSplit,
+    resolveSplitChannel,
 } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -25,13 +25,13 @@ const scatterPlot: DxTemplateDef = {
         const hasColor = context.encodings.color != null;
         const sizeField = fieldOf(context, 'size');
         // A Bubble series rejects color outright (see below) — structurally,
-        // whatever the channel's type — so resolveColorSplit's continuous-
+        // whatever the channel's type — so resolveSplitChannel's continuous-
         // channel check must not even run there, or a continuous color on a
         // Bubble would earn two notes for the same channel: this one and the
         // Bubble one below. The legend follows whether a split actually
         // happened, not merely whether a color channel was bound — otherwise
         // it turns on with nothing in it to label.
-        const splitsByColor = !sizeField && resolveColorSplit(spec, context);
+        const splitsByColor = !sizeField && resolveSplitChannel(spec, context, 'color');
         applyCartesianFrame(spec, context, { rotated: false, legend: splitsByColor });
         if (sizeField) {
             // Bubble encodes the third measure in the marker area, so a color
@@ -77,9 +77,9 @@ const connectedScatterPlot: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
-        const hasColor = resolveColorSplit(spec, context);
-        applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
-        if (hasColor) {
+        const splitsByColor = resolveSplitChannel(spec, context, 'color');
+        applyCartesianFrame(spec, context, { rotated: false, legend: splitsByColor });
+        if (splitsByColor) {
             applySplitSeries(spec, context, 'color', 'ScatterLine', false);
         } else {
             spec.series = [baseSeries(context, 'ScatterLine')];
