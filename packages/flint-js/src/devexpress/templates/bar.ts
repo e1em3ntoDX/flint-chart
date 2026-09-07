@@ -299,6 +299,19 @@ const barChart: DxTemplateDef = {
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: false });
         spec.series = [{ ...baseSeries(context, 'Bar'), labelsVisible: true }];
+        if (context.encodings.color != null) {
+            // Grouped Bar Chart and Stacked Bar Chart already exist as the
+            // dedicated templates for a color split — silently picking one of
+            // those shapes for a caller who asked for plain "Bar Chart" would
+            // quietly change what they asked for. So this stays a single,
+            // unsplit series, and the note names the templates that do split.
+            noteUnsupported(spec, {
+                feature: 'color',
+                action: 'rejected',
+                detail: 'Bar Chart renders a single, unsplit series; the color encoding was '
+                    + 'not applied. Use "Grouped Bar Chart" or "Stacked Bar Chart" to split by category.',
+            });
+        }
         if (context.encodings.opacity != null) {
             noteUnsupported(spec, {
                 feature: 'opacity',

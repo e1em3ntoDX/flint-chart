@@ -96,6 +96,8 @@ describe('Scatter Plot template', () => {
         const note = plan.unsupported!.find((n) => n.feature === 'color');
         expect(note).toBeDefined();
         expect(note!.action).toBe('rejected');
+        // No split happened, so a legend would label nothing — it must stay off.
+        expect(plan.legend!.visible).toBe(false);
     });
 
     it('rejects an opacity channel out loud instead of dropping it', () => {

@@ -4,7 +4,7 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
-import { applyCartesianFrame, applySplitSeries, baseSeries } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries, noteUnsupported } from './bar';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
@@ -42,6 +42,26 @@ const lineChart: DxTemplateDef = {
         } else {
             spec.series = [{ ...baseSeries(context, viewType), labelsVisible: true }];
         }
+        if (context.encodings.opacity != null) {
+            noteUnsupported(spec, {
+                feature: 'opacity',
+                action: 'rejected',
+                detail: 'dxChart has no data-driven per-point opacity channel; '
+                    + 'the encoding was ignored.',
+            });
+        }
+        if (context.encodings.detail != null) {
+            noteUnsupported(spec, {
+                feature: 'detail',
+                action: 'rejected',
+                detail: 'dxChart has no unlabeled series-per-value split; bind color instead if '
+                    + 'the values should render as distinct series.',
+            });
+        }
+        // `strokeDash` is deliberately left un-reported here: dxChart series
+        // expose a real `dashStyle` option, so this encoding may be genuinely
+        // implementable rather than unsupported. Stamping it "rejected" would
+        // be a guess pending that investigation.
     },
 };
 

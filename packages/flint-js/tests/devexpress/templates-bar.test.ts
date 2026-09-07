@@ -102,6 +102,29 @@ describe('Bar Chart template', () => {
         expect(note).toBeDefined();
         expect(note!.action).toBe('rejected');
     });
+
+    it('rejects a color channel out loud instead of silently splitting or dropping it', () => {
+        // Plain Bar Chart deliberately does not split by color: Grouped Bar
+        // Chart and Stacked Bar Chart already exist as the dedicated templates
+        // for that, and picking one of those shapes for a caller who asked for
+        // "Bar Chart" would quietly change what they asked for. So this stays a
+        // single, unsplit series, with a note pointing at the right template.
+        const def = dxGetTemplateDef('Bar Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'quarter' }, y: { field: 'revenue' }, color: { field: 'region' } },
+            channelSemantics: {
+                x: { field: 'quarter', type: 'nominal' } as never,
+                y: { field: 'revenue', type: 'quantitative', zero: true } as never,
+                color: { field: 'region', type: 'nominal' } as never,
+            },
+        }));
+        expect(plan.series).toHaveLength(1);
+        expect(plan.series![0].viewType).toBe('Bar');
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 /** Long-format rows: North(Q1=100, Q2=150) / South(Q1=200) — South has no Q2. */

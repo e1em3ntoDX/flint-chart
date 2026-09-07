@@ -22,8 +22,13 @@ const scatterPlot: DxTemplateDef = {
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
         const hasColor = context.encodings.color != null;
-        applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const sizeField = fieldOf(context, 'size');
+        // A Bubble series rejects color rather than splitting by it (see
+        // below), so the legend must follow whether a split actually
+        // happened, not merely whether a color channel was bound — otherwise
+        // it turns on with nothing in it to label.
+        const splitsByColor = hasColor && !sizeField;
+        applyCartesianFrame(spec, context, { rotated: false, legend: splitsByColor });
         if (sizeField) {
             // Bubble encodes the third measure in the marker area, so a color
             // split would need a series per category *and* per bubble size —

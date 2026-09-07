@@ -102,6 +102,38 @@ describe('Line Chart template', () => {
         def.instantiate(plan, context({ chartProperties: { orient: 'horizontal' } }));
         expect(plan.diagram!.rotated).toBe(false);
     });
+
+    it('rejects an opacity channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Line Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, opacity: { field: 'sales' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                opacity: { field: 'sales', type: 'quantitative' } as never,
+            },
+        }));
+        const note = plan.unsupported!.find((n) => n.feature === 'opacity');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
+
+    it('rejects a detail channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Line Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, detail: { field: 'sku' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                detail: { field: 'sku', type: 'nominal' } as never,
+            },
+        }));
+        const note = plan.unsupported!.find((n) => n.feature === 'detail');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 describe('Area Chart template', () => {
@@ -154,6 +186,23 @@ describe('Area Chart template', () => {
             { month: '2026-02', A: 14, B: 31 },
         ]);
     });
+
+    it('rejects an opacity channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Area Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Area Chart',
+            encodings: { x: { field: 'month' }, y: { field: 'sales' }, opacity: { field: 'sales' } },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'sales', type: 'quantitative' } as never,
+                opacity: { field: 'sales', type: 'quantitative' } as never,
+            },
+        }));
+        const note = plan.unsupported!.find((n) => n.feature === 'opacity');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
+    });
 });
 
 describe('Range Area Chart template', () => {
@@ -193,6 +242,28 @@ describe('Range Area Chart template', () => {
             table: [{ month: '2026-01', low: 5, high: 15 }],
         }));
         expect(plan.series![0].name).toBe('Low–High');
+    });
+
+    it('rejects a color channel out loud instead of dropping it', () => {
+        const def = dxGetTemplateDef('Range Area Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Range Area Chart',
+            encodings: {
+                x: { field: 'month' }, y: { field: 'low' }, y2: { field: 'high' }, color: { field: 'region' },
+            },
+            channelSemantics: {
+                x: { field: 'month', type: 'temporal' } as never,
+                y: { field: 'low', type: 'quantitative' } as never,
+                y2: { field: 'high', type: 'quantitative' } as never,
+                color: { field: 'region', type: 'nominal' } as never,
+            },
+            table: [{ month: '2026-01', low: 5, high: 15, region: 'North' }],
+        }));
+        expect(plan.series).toHaveLength(1);
+        const note = plan.unsupported!.find((n) => n.feature === 'color');
+        expect(note).toBeDefined();
+        expect(note!.action).toBe('rejected');
     });
 });
 

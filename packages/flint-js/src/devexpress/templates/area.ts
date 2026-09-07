@@ -4,7 +4,9 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
-import { applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName, resolveAxisRoles } from './bar';
+import {
+    applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName, noteUnsupported, resolveAxisRoles,
+} from './bar';
 import { resolveArgumentScaleType, resolveTooltipFormat, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
@@ -41,6 +43,14 @@ const areaChart: DxTemplateDef = {
         } else {
             spec.series = [baseSeries(context, viewType)];
         }
+        if (context.encodings.opacity != null) {
+            noteUnsupported(spec, {
+                feature: 'opacity',
+                action: 'rejected',
+                detail: 'dxChart has no data-driven per-point opacity channel; '
+                    + 'the encoding was ignored.',
+            });
+        }
     },
 };
 
@@ -68,6 +78,17 @@ const rangeAreaChart: DxTemplateDef = {
             valueFormat: resolveTooltipFormat(context.channelSemantics.y),
         };
         spec.series = [series];
+        if (context.encodings.color != null) {
+            // RangeArea plots one fixed low/high band; there is no per-series
+            // shape here for a category split to land on. Report rather than
+            // drop.
+            noteUnsupported(spec, {
+                feature: 'color',
+                action: 'rejected',
+                detail: 'Range Area Chart renders a single low/high band and does not split by '
+                    + 'category; the encoding was ignored.',
+            });
+        }
     },
 };
 
