@@ -7,9 +7,9 @@
  *
  * Core may express a decision as a primitive or as a descriptor object. Every
  * such read is funnelled through this file so a core refactor breaks one place.
- * Concrete observed shapes are recorded in docs/flint-api-notes.md.
+ * Concrete observed shapes are recorded in docs/devexpress-core-api-notes.md.
  *
- * Reconciliation notes (Task 5, Step 5 — see docs/flint-api-notes.md):
+ * Reconciliation notes (see docs/devexpress-core-api-notes.md):
  * - `zero`: `resolveChannelSemantics` never sets it; each backend assembler
  *   calls `computeZeroDecision` itself and merges the plain boolean `zero`
  *   field onto the channel semantics object it already has, before this

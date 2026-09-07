@@ -24,7 +24,7 @@ describe('resolveIncludeZero', () => {
         expect(resolveIncludeZero({ zero: 'maybe' } as never)).toBe(false);
     });
 
-    // Reconciliation (docs/flint-api-notes.md): resolveChannelSemantics never
+    // Reconciliation (docs/devexpress-core-api-notes.md): resolveChannelSemantics never
     // sets `zero` at all — the doc comment says zero-baseline "requires
     // template mark knowledge that belongs to the assembler." Each backend
     // assembler calls computeZeroDecision itself (real return shape:
@@ -63,7 +63,7 @@ describe('resolveLabelFormat', () => {
         expect(resolveLabelFormat({ format: { pattern: '0.0%' } } as never)).toBe('0.0%');
     });
 
-    // Reconciliation (docs/flint-api-notes.md): the real capture never
+    // Reconciliation (docs/devexpress-core-api-notes.md): the real capture never
     // populated `.format` (only `.tooltipFormat`, out of scope for this
     // reader) — but the FormatSpec shape it and `.format` share, per
     // field-semantics.ts:69, is
@@ -128,7 +128,7 @@ describe('resolveLogarithmic and resolvePaletteClass', () => {
         expect(resolvePaletteClass(undefined)).toBe('categorical');
     });
 
-    // Reconciliation (docs/flint-api-notes.md): the real colorScheme shape is
+    // Reconciliation (docs/devexpress-core-api-notes.md): the real colorScheme shape is
     // ColorSchemeRecommendation (semantic-types.ts:591):
     // { scheme: string; type: ColorSchemeType; reason: string; domainMid?: number }
     // where `type` is one of 'sequential' | 'diverging' | 'categorical'. The

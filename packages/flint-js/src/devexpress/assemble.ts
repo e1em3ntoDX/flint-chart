@@ -71,7 +71,7 @@ interface CoreStageResult {
 /**
  * Runs Flint's backend-agnostic stages 1-2 (`docs/adding-a-backend.md` §2)
  * unchanged, in the order `src/vegalite/assemble.ts` establishes. Every call's
- * real signature is the one characterized in `docs/flint-api-notes.md`.
+ * real signature is the one characterized in `docs/devexpress-core-api-notes.md`.
  *
  * Deliberately *not* re-derived here: zero baseline, formats, scale types and
  * colour classes all come out of core; this function only sequences them.
@@ -121,7 +121,7 @@ function runCoreStages(
     // ── PHASE 0b: finalize the zero baseline ─────────────────────────────
     // resolveChannelSemantics deliberately leaves `zero` unset: the decision
     // needs template mark knowledge that only an assembler has (confirmed
-    // empirically — docs/flint-api-notes.md, "zero is absent"). So, exactly as
+    // empirically — docs/devexpress-core-api-notes.md, "zero is absent"). So, exactly as
     // vegalite/assemble.ts:234-245 does, we call computeZeroDecision
     // (core/semantic-types.ts:454) per quantitative position channel and merge
     // the result onto the semantics the templates will read.
@@ -166,7 +166,7 @@ function runCoreStages(
     };
 
     // ── STEP 0c: budgets → overflow filtering ────────────────────────────
-    // Fixed order (docs/flint-api-notes.md): computeChannelBudgets
+    // Fixed order (docs/devexpress-core-api-notes.md): computeChannelBudgets
     // (core/compute-layout.ts:1310) → filterOverflow (core/filter-overflow.ts:54)
     // → computeLayout (core/compute-layout.ts:264). Faceting is rejected before
     // we get here, so budgets.facetGrid is always undefined.
@@ -178,7 +178,7 @@ function runCoreStages(
         budgets, new Set<string>([markType]),
     );
     // The result field is `filteredData`, NOT `data` — see the note in
-    // docs/flint-api-notes.md under filterOverflow.
+    // docs/devexpress-core-api-notes.md under filterOverflow.
     const table: any[] = overflow.filteredData;
     warnings.push(...overflow.warnings);
 
@@ -350,7 +350,7 @@ export function assembleDevExpressPlan(
     // confirmed directly against the real merged 0.5 type during planning.
     // Resolved before runCoreStages, which needs it for the palette pick.
     const theme = resolveThemeSpec(input.theme_spec);
-    // Stages 1-2: run core unchanged. See docs/flint-api-notes.md for exact signatures.
+    // Stages 1-2: run core unchanged. See docs/devexpress-core-api-notes.md for exact signatures.
     const pipeline = runCoreStages(input, def, chartType, theme);
 
     const context: InstantiateContext = {

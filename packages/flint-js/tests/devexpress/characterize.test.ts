@@ -8,9 +8,9 @@
  *
  * This test asserts almost nothing about Flint's behavior. Its purpose is to
  * PRINT the real runtime shapes of a handful of Flint core functions so they
- * can be transcribed, verbatim, into docs/flint-api-notes.md at the root of
- * the DevExpress spike repo. Every later task in the DevExpress backend plan
- * depends on those notes being accurate rather than assumed.
+ * can be transcribed, verbatim, into docs/devexpress-core-api-notes.md.
+ * Every later task in the DevExpress backend plan depends on those notes
+ * being accurate rather than assumed.
  *
  * Do not add assertions here beyond "it ran and produced a shape" — the point
  * is observation, not verification of Flint's own correctness (that's covered
