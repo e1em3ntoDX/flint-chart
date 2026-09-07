@@ -359,7 +359,13 @@ const groupedBarChart: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
-        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: true });
+        // Unlike color, 'group' has no continuous/discrete distinction to
+        // resolve — it only ever declines by being absent (confirmed by the
+        // existing "falls back to a single series when no group channel is
+        // bound" test, where splitSeries's own `!splitField` fallback kicks
+        // in). So the legend just follows whether the channel was bound.
+        const hasGroup = context.encodings.group != null;
+        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: hasGroup });
         applySplitSeries(spec, context, 'group', 'Bar', true);
     },
 };
@@ -373,14 +379,21 @@ const stackedBarChart: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
-        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: true });
+        // Computed once, before the frame: the legend must follow whether a
+        // split actually happened, not merely whether `color` was bound —
+        // otherwise a continuous color (declined below) would still turn the
+        // legend on to label a single series. Calling resolveColorSplit here
+        // and reusing the result (rather than calling it again inside the
+        // branch) also keeps the rejection note from firing twice.
+        const splitsByColor = resolveColorSplit(spec, context);
+        applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: splitsByColor });
         // stackable is core's decision about the MEASURE channel, so it has to
         // be read off whichever channel resolveAxisRoles found the value on,
         // not off literal y — a reversed chart's stackable flag lives on x.
         const { valueAxis } = resolveAxisRoles(context);
         const normalized = context.channelSemantics[valueAxis]?.stackable === 'normalize';
         const viewType = normalized ? 'FullStackedBar' : 'StackedBar';
-        if (resolveColorSplit(spec, context)) {
+        if (splitsByColor) {
             applySplitSeries(spec, context, 'color', viewType, true);
         } else {
             spec.series = [{ ...baseSeries(context, viewType), labelsVisible: true }];

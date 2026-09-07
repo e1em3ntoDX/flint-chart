@@ -157,6 +157,7 @@ describe('Grouped Bar Chart template', () => {
         def.instantiate(plan, groupedContext());
         expect(plan.series!.map((s) => s.name).sort()).toEqual(['North', 'South']);
         expect(plan.series!.every((s) => s.viewType === 'Bar')).toBe(true);
+        expect(plan.legend!.visible).toBe(true);
     });
 
     // The regression the final whole-branch review caught: every series carried
@@ -233,10 +234,12 @@ describe('Grouped Bar Chart template', () => {
         def.instantiate(plan, context({ chartType: 'Grouped Bar Chart' }));
         expect(plan.series).toHaveLength(1);
         expect(plan.series![0].valueFields).toEqual(['revenue']);
-        // No split happened, so the raw table stands as the data source.
+        // No split happened, so the raw table stands as the data source, and
+        // there is nothing for a legend to label.
         expect(plan.data!.points).toEqual([
             { quarter: 'Q1', revenue: 1200 }, { quarter: 'Q2', revenue: 1450 },
         ]);
+        expect(plan.legend!.visible).toBe(false);
     });
 
     it('does not humanize category values used as split-series names', () => {
@@ -313,6 +316,7 @@ describe('Stacked Bar Chart template', () => {
             { quarter: 'Q1', North: 100, South: 50 },
             { quarter: 'Q2', North: 200, South: 75 },
         ]);
+        expect(plan.legend!.visible).toBe(true);
     });
 
     it('does not split on a continuous color channel', () => {
@@ -336,6 +340,8 @@ describe('Stacked Bar Chart template', () => {
         const note = plan.unsupported!.find((n) => n.feature === 'color');
         expect(note).toBeDefined();
         expect(note!.action).toBe('rejected');
+        // No split happened, so there is nothing for a legend to label.
+        expect(plan.legend!.visible).toBe(false);
     });
 });
 
