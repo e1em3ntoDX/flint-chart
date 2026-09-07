@@ -185,14 +185,24 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
     const diagram = plan.diagram!;
     const cartesianLegend: Record<string, unknown> = { visible: plan.legend.visible, position: 'outside' };
     if (plan.typography.legend) cartesianLegend.font = plan.typography.legend;
+    // dxChart's argumentAxis/valueAxis options are ROLE-based (argument vs
+    // value), not screen-position-based: `rotated` only swaps which side of
+    // the screen each role renders on, and cannot itself disambiguate which
+    // AxisPlan plays which role (see DiagramPlan.argumentAxisChannel's own
+    // doc comment — the same `rotated:true` covers both an explicit
+    // orient:'horizontal' request with the category still on x, and a
+    // category genuinely detected on y). So route by the plan's explicit
+    // argumentAxisChannel rather than assuming axisX is always the argument.
+    const argumentAxisPlan = diagram.argumentAxisChannel === 'x' ? diagram.axisX : diagram.axisY;
+    const valueAxisPlan = diagram.argumentAxisChannel === 'x' ? diagram.axisY : diagram.axisX;
     return {
         component: 'dxChart',
         options: {
             dataSource: plan.data.points,
             palette: plan.palette.colors,
             rotated: diagram.rotated,
-            argumentAxis: axisOptions(diagram.axisX, false, plan.typography.axisLabel, plan.typography.axisTitle),
-            valueAxis: axisOptions(diagram.axisY, true, plan.typography.axisLabel, plan.typography.axisTitle),
+            argumentAxis: axisOptions(argumentAxisPlan, false, plan.typography.axisLabel, plan.typography.axisTitle),
+            valueAxis: axisOptions(valueAxisPlan, true, plan.typography.axisLabel, plan.typography.axisTitle),
             legend: cartesianLegend,
             title: titleOptions(plan.titles, plan.typography),
             tooltip: {

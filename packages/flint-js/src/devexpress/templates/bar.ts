@@ -87,6 +87,10 @@ export function applyCartesianFrame(
         rotated: options.rotated || categoryAxis === 'y',
         axisX: axis(context, 'x', valueAxis === 'x'),
         axisY: axis(context, 'y', valueAxis === 'y'),
+        // `rotated` alone cannot tell a renderer which AxisPlan plays which
+        // role (see the field's own doc comment on DiagramPlan) — it has to be
+        // stated here, where the role is actually decided.
+        argumentAxisChannel: categoryAxis,
     };
     plan.legend = options.legend
         ? { visible: true, position: 'right' }
@@ -317,7 +321,11 @@ const stackedBarChart: DxTemplateDef = {
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
         applyCartesianFrame(spec, context, { rotated: isHorizontal(context), legend: true });
-        const normalized = context.channelSemantics.y?.stackable === 'normalize';
+        // stackable is core's decision about the MEASURE channel, so it has to
+        // be read off whichever channel resolveAxisRoles found the value on,
+        // not off literal y — a reversed chart's stackable flag lives on x.
+        const { valueAxis } = resolveAxisRoles(context);
+        const normalized = context.channelSemantics[valueAxis]?.stackable === 'normalize';
         applySplitSeries(spec, context, 'color', normalized ? 'FullStackedBar' : 'StackedBar', true);
     },
 };

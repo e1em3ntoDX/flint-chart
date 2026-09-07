@@ -106,6 +106,36 @@ describe('planToDevExtreme', () => {
         expect(options.rotated).toBe(true);
     });
 
+    // Regression for the projector bug §4.1's fix exposed one layer down: the
+    // plan-level fix (baseSeries/applyCartesianFrame) can be correct while
+    // planToDevExtreme still wires argumentAxis/valueAxis by literal axisX/axisY,
+    // which is wrong whenever the category lands on y. Asserting on the PLAN
+    // (diagram.axisX/axisY) would have missed this — the plan was always
+    // correct — so this asserts on the actual projected DevExtreme options.
+    it('routes argumentAxis/valueAxis by role, not by literal x/y, for a reversed-axis plan', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [{ region: 'North', revenue: 100 }, { region: 'South', revenue: 250 }] },
+            semantic_types: { region: 'Country', revenue: 'Price' },
+            chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'revenue' }, y: { field: 'region' } } },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.diagram!.argumentAxisChannel).toBe('y');
+
+        const { options } = planToDevExtreme(plan);
+        const argumentAxis = options.argumentAxis as Record<string, unknown>;
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        // The category (region) is the argument, regardless of which plan
+        // channel it happened to land on.
+        expect(argumentAxis.title).toBe('Region');
+        expect(valueAxis.title).toBe('Revenue');
+        // The zero baseline and gridlines belong to the measure, so they must
+        // land on the projected valueAxis, not the projected argumentAxis.
+        expect(valueAxis.showZero).toBe(true);
+        expect((valueAxis.grid as Record<string, unknown>).visible).toBe(true);
+        expect(argumentAxis.showZero).toBeUndefined();
+        expect((argumentAxis.grid as Record<string, unknown>).visible).toBe(false);
+    });
+
     // End-to-end guard for the multi-series defect: the dxChart options must
     // give every series a DIFFERENT valueField over a wide-format dataSource.
     // Identical valueFields over a shared long-format dataSource is exactly the

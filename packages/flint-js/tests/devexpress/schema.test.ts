@@ -28,6 +28,7 @@ function validPlan() {
             rotated: false,
             axisX: { includeZero: false, logarithmic: false, gridLines: false, reverse: false },
             axisY: { includeZero: true, logarithmic: false, gridLines: true, reverse: false },
+            argumentAxisChannel: 'x',
         },
         legend: { visible: false, position: 'none' },
         palette: { class: 'categorical', colors: ['#4E79A7'] },
@@ -113,6 +114,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
                 axisLabel: { size: 13 },
             },
         })],
+        ['a reversed-axis plan where the argument axis is y', () => {
+            const p = validPlan();
+            p.diagram.argumentAxisChannel = 'y';
+            return p;
+        }],
     ];
 
     const rejected: Array<[string, () => unknown]> = [
@@ -139,6 +145,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
         ['a non-boolean axis flag', () => {
             const p = validPlan();
             (p.diagram.axisY as Record<string, unknown>).includeZero = 'yes';
+            return p;
+        }],
+        ['an invalid argumentAxisChannel', () => {
+            const p = validPlan();
+            (p.diagram as Record<string, unknown>).argumentAxisChannel = 'z';
             return p;
         }],
         ['an invalid argument scale type', () => {

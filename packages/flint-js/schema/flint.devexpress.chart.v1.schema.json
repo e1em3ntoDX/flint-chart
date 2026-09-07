@@ -62,7 +62,7 @@
       "description": "Null when family is Circular.",
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["rotated", "axisX", "axisY"],
+      "required": ["rotated", "axisX", "axisY", "argumentAxisChannel"],
       "properties": {
         "rotated": {
           "type": "boolean",
@@ -73,6 +73,10 @@
         },
         "axisY": {
           "$ref": "#/$defs/axisPlan"
+        },
+        "argumentAxisChannel": {
+          "enum": ["x", "y"],
+          "description": "Which of axisX/axisY carries the argument (category) axis; the other carries the value (measure) axis. Not inferable from rotated, which conflates an explicit horizontal-orientation request with a category detected on y."
         }
       }
     },

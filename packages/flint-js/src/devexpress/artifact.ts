@@ -37,6 +37,7 @@ const ARGUMENT_SCALE_TYPES = ['Qualitative', 'Numerical', 'DateTime'] as const;
 const VALUE_SCALE_TYPES = ['Numerical', 'DateTime'] as const;
 const WARNING_SEVERITIES = ['info', 'warning', 'error'] as const;
 const UNSUPPORTED_ACTIONS = ['rejected', 'downgraded'] as const;
+const AXIS_CHANNELS = ['x', 'y'] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -234,6 +235,7 @@ export function prepareDevExpressPlan(value: unknown): DevExpressChartPlan {
         requireBoolean(diagram.rotated, 'diagram.rotated');
         validateAxis(diagram.axisX, 'diagram.axisX');
         validateAxis(diagram.axisY, 'diagram.axisY');
+        requireEnum(diagram.argumentAxisChannel, AXIS_CHANNELS, 'diagram.argumentAxisChannel');
     } else if (plan.diagram != null) {
         // A Circular plan with a diagram is not a harmless extra: it says the
         // producer thinks this is a Cartesian chart, and a renderer that trusts

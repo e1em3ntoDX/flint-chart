@@ -23,6 +23,7 @@ function validPlan(): DevExpressChartPlan {
             rotated: false,
             axisX: { includeZero: false, logarithmic: false, gridLines: false, reverse: false },
             axisY: { includeZero: true, logarithmic: false, gridLines: true, reverse: false },
+            argumentAxisChannel: 'x',
         },
         legend: { visible: false, position: 'none' },
         palette: { class: 'categorical', colors: ['#4E79A7'] },
@@ -145,6 +146,19 @@ describe('prepareDevExpressPlan — malformed plans the renderer would choke on'
         plan.diagram!.axisY.includeZero = 'yes' as never;
         expect(() => prepareDevExpressPlan(plan))
             .toThrow(/diagram\.axisY\.includeZero must be a boolean/);
+    });
+
+    it('accepts argumentAxisChannel: \'y\' for a reversed-axis diagram', () => {
+        const plan = validPlan();
+        plan.diagram!.argumentAxisChannel = 'y';
+        expect(prepareDevExpressPlan(plan).diagram!.argumentAxisChannel).toBe('y');
+    });
+
+    it('rejects an invalid argumentAxisChannel', () => {
+        const plan = validPlan();
+        plan.diagram!.argumentAxisChannel = 'z' as never;
+        expect(() => prepareDevExpressPlan(plan))
+            .toThrow(/diagram\.argumentAxisChannel must be one of x, y/);
     });
 
     it('rejects a non-object diagram', () => {

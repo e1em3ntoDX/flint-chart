@@ -66,6 +66,22 @@ export interface DiagramPlan {
     rotated: boolean;
     axisX: AxisPlan;
     axisY: AxisPlan;
+    /**
+     * Which physical channel (`axisX` or `axisY`) carries the argument
+     * (category) axis; the other one carries the value (measure) axis.
+     *
+     * Not inferable from `rotated`: `rotated` is `true` both when the category
+     * is on `axisX` and the chart was asked to render horizontally (an
+     * explicit `orient:'horizontal'` request) AND when the category was
+     * detected on `axisY` in the first place — one boolean, two situations a
+     * renderer cannot tell apart. A DevExtreme-style renderer needs to know
+     * which `AxisPlan` to hand to its role-based `argumentAxis`/`valueAxis`
+     * options (dxChart's `rotated` only swaps which SIDE of the screen each
+     * role renders on, never which config object plays which role), so the
+     * plan has to state the role explicitly rather than have every consumer
+     * re-derive it.
+     */
+    argumentAxisChannel: 'x' | 'y';
 }
 
 export interface PalettePlan {

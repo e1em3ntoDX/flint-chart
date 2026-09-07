@@ -4,14 +4,20 @@
 
 import type { InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan, SeriesPlan } from '../plan';
-import { applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName } from './bar';
+import { applyCartesianFrame, applySplitSeries, baseSeries, humanizeFieldName, resolveAxisRoles } from './bar';
 import { resolveArgumentScaleType, resolveTooltipFormat, resolveValueScaleType } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
 
 type Draft = Partial<DevExpressChartPlan>;
 
+/**
+ * stackable is core's decision about the MEASURE channel, so it must be read
+ * off whichever channel resolveAxisRoles resolved as the value axis, not off
+ * literal y — a reversed Area Chart's stackable flag lives on x.
+ */
 function areaViewType(context: InstantiateContext): string {
-    switch (context.channelSemantics.y?.stackable) {
+    const { valueAxis } = resolveAxisRoles(context);
+    switch (context.channelSemantics[valueAxis]?.stackable) {
         case 'normalize': return 'FullStackedArea';
         case 'sum': return 'StackedArea';
         default: return 'Area';
