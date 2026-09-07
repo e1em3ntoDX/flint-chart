@@ -166,8 +166,23 @@ describe('MCP server', () => {
     expect(payload.plan.chartType).toBe('Bar Chart');
     expect(payload.plan.target).toBe('devextreme');
     expect(payload.plan.family).toBe('Cartesian');
-    expect(payload.projection.component).toBe('dxChart');
-    expect(payload.projection.options).toBeTruthy();
+  });
+
+  it('returns the plan only, never a projection whose formatters JSON drops', async () => {
+    const res: any = await client.callTool({
+      name: 'create_devexpress_chart',
+      arguments: {
+        data: { values: [{ q: 'Q1', v: 1 }, { q: 'Q2', v: 2 }] },
+        semantic_types: { q: 'Quarter', v: 'Quantity' },
+        chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'q' }, y: { field: 'v' } } },
+      },
+    });
+    expect(res.isError).toBeFalsy();
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.plan).toBeDefined();
+    expect(payload.projection).toBeUndefined();
+    // The dataset appears exactly once in the response.
+    expect(res.content[0].text.split('"Q1"').length - 1).toBe(1);
   });
 
   it('create_devexpress_chart surfaces a thrown assembler error (missing required channel) with its original message', async () => {

@@ -10,7 +10,7 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import { z } from 'zod';
 
-import { assembleDevExpressPlan, planToDevExtreme } from 'flint-chart';
+import { assembleDevExpressPlan } from 'flint-chart';
 
 import { renderChart, resolveDataSource } from './render/index.js';
 import { prepareInput } from './render/assemble.js';
@@ -317,9 +317,11 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       description:
         'Compile a Flint chart spec into a DevExpress chart plan (schema ' +
         '"flint.devexpress.chart/v1") for the DevExtreme web target. Returns ' +
-        '{ plan, projection }: plan is the target-neutral, schema-validated JSON ' +
-        'contract (also consumable by a non-JS renderer); projection is the ' +
-        'ready-to-use dxChart/dxPieChart options object. The DevExpress backend ' +
+        '{ plan }: the target-neutral, schema-validated JSON contract, also ' +
+        'consumable by a non-JS renderer. Call planToDevExtreme(plan) on the ' +
+        'client to get dxChart/dxPieChart options — it is not returned here ' +
+        'because its label and tooltip callbacks cannot survive JSON transport. ' +
+        'The DevExpress backend ' +
         'has no facet grid — column/row encodings are rejected by this tool\'s ' +
         'own input schema — and chart_spec.chartType is restricted to the chart ' +
         'types the devextreme target actually supports.',
@@ -341,8 +343,16 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
           'devextreme',
         );
         const plan = assembleDevExpressPlan(input, { target: 'devextreme' });
-        const projection = planToDevExtreme(plan);
-        return jsonResult({ plan, projection });
+        // Deliberately NOT returning planToDevExtreme(plan) alongside it.
+        // jsonResult is JSON.stringify, and the projection's value is in its
+        // function-valued options — label.customizeText, tooltip.customizeTooltip,
+        // and the multi-value Range Area / Candlestick tooltip logic — every one
+        // of which stringify drops silently, leaving point labels switched on but
+        // unformatted. The plan is the contract; planToDevExtreme is the client's
+        // call, on the client, where the callbacks survive. Same reason
+        // tests/devexpress/devextreme.test.ts:195 moved its round-trip assertions
+        // client-side. It also stops each response from printing the dataset twice.
+        return jsonResult({ plan });
       } catch (err) {
         return errorResult(err);
       }
