@@ -86,6 +86,7 @@
   "files": [
     "dist",
     "src",
+    "schema",
     "README.md",
     "LICENSE"
   ],

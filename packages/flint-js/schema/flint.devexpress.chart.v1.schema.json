@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devexpress.com/schema/flint.devexpress.chart.v1.json",
+  "title": "Flint DevExpress chart plan v1",
+  "description": "Declarative, target-neutral description of a DevExpress chart, mirroring flint-chart/packages/flint-js/src/devexpress/plan.ts. The cross-language contract between the Flint TypeScript assembler and a .NET (DevExtreme/XtraCharts) renderer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "chartType",
+    "target",
+    "family",
+    "dataMode",
+    "data",
+    "series",
+    "diagram",
+    "legend",
+    "palette",
+    "titles",
+    "typography",
+    "warnings",
+    "unsupported"
+  ],
+  "properties": {
+    "schema": {
+      "const": "flint.devexpress.chart/v1"
+    },
+    "chartType": {
+      "type": "string",
+      "description": "The Flint chart type this plan was compiled from, for provenance."
+    },
+    "target": {
+      "enum": ["devextreme", "xtracharts"]
+    },
+    "family": {
+      "enum": ["Cartesian", "Circular"]
+    },
+    "dataMode": {
+      "const": "materialized"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["points"],
+      "properties": {
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/seriesPlan"
+      }
+    },
+    "diagram": {
+      "description": "Null when family is Circular.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["rotated", "axisX", "axisY"],
+      "properties": {
+        "rotated": {
+          "type": "boolean",
+          "description": "True for horizontal bars."
+        },
+        "axisX": {
+          "$ref": "#/$defs/axisPlan"
+        },
+        "axisY": {
+          "$ref": "#/$defs/axisPlan"
+        }
+      }
+    },
+    "legend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visible", "position"],
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "position": {
+          "enum": ["right", "bottom", "none"]
+        }
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "colors"],
+      "properties": {
+        "class": {
+          "enum": ["categorical", "sequential", "diverging"]
+        },
+        "colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "titles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/titlePlan"
+      }
+    },
+    "typography": {
+      "$ref": "#/$defs/typographyPlan"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/chartWarning"
+      }
+    },
+    "unsupported": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unsupportedNote"
+      }
+    }
+  },
+  "$defs": {
+    "viewType": {
+      "description": "DevExpress.XtraCharts.ViewType member NAME. Mirrors SUPPORTED_VIEW_TYPES in flint-chart/packages/flint-js/src/devexpress/artifact.ts exactly; kept in sync by a drift test.",
+      "enum": [
+        "Bar",
+        "StackedBar",
+        "FullStackedBar",
+        "Line",
+        "Spline",
+        "StepLine",
+        "ScatterLine",
+        "Area",
+        "StackedArea",
+        "FullStackedArea",
+        "RangeArea",
+        "Point",
+        "Bubble",
+        "CandleStick",
+        "Pie",
+        "Doughnut",
+        "Waterfall",
+        "BoxPlot",
+        "Gantt",
+        "RadarLine",
+        "RadarArea",
+        "Funnel"
+      ]
+    },
+    "seriesPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "viewType",
+        "argumentField",
+        "valueFields",
+        "argumentScaleType",
+        "valueScaleType",
+        "labelsVisible"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Legend/series name."
+        },
+        "viewType": {
+          "$ref": "#/$defs/viewType"
+        },
+        "argumentField": {
+          "type": "string",
+          "description": "Field supplying point arguments."
+        },
+        "valueFields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields supplying point values. More than one for range and financial views."
+        },
+        "argumentScaleType": {
+          "enum": ["Qualitative", "Numerical", "DateTime"]
+        },
+        "valueScaleType": {
+          "enum": ["Numerical", "DateTime"]
+        },
+        "color": {
+          "type": "string",
+          "description": "Explicit series colour, when Flint's colour decisions assigned one."
+        },
+        "labelsVisible": {
+          "type": "boolean"
+        },
+        "markerKind": {
+          "type": "string",
+          "description": "Marker kind name for point-family views, e.g. \"Circle\"."
+        },
+        "valueFormat": {
+          "$ref": "#/$defs/valueFormat"
+        }
+      }
+    },
+    "axisPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["includeZero", "logarithmic", "gridLines", "reverse"],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "labelFormat": {
+          "type": "string",
+          "description": "Format string for tick labels."
+        },
+        "includeZero": {
+          "type": "boolean",
+          "description": "From Flint's zero decision. Ignored on qualitative axes."
+        },
+        "logarithmic": {
+          "type": "boolean"
+        },
+        "gridLines": {
+          "type": "boolean"
+        },
+        "reverse": {
+          "type": "boolean"
+        }
+      }
+    },
+    "titlePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "role"],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "role": {
+          "enum": ["chart", "subtitle"]
+        }
+      }
+    },
+    "fontSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number"
+        },
+        "weight": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string"
+        }
+      }
+    },
+    "typographyPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/fontSpec"
+        },
+        "subtitle": {
+          "$ref": "#/$defs/fontSpec"
+        },
+        "axisLabel": {
+          "$ref": "#/$defs/fontSpec"
+        },
+        "axisTitle": {
+          "$ref": "#/$defs/fontSpec"
+        },
+        "legend": {
+          "$ref": "#/$defs/fontSpec"
+        },
+        "dataLabel": {
+          "$ref": "#/$defs/fontSpec"
+        }
+      }
+    },
+    "chartWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": {
+          "enum": ["info", "warning", "error"]
+        },
+        "code": {
+          "type": "string",
+          "description": "Short machine-readable warning code."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable description."
+        },
+        "channel": {
+          "type": "string",
+          "description": "Optional: which channel(s) triggered the warning."
+        },
+        "field": {
+          "type": "string",
+          "description": "Optional: which field triggered the warning."
+        }
+      }
+    },
+    "unsupportedNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "action", "detail"],
+      "properties": {
+        "feature": {
+          "type": "string"
+        },
+        "action": {
+          "enum": ["rejected", "downgraded"]
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "valueFormat": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "abbreviate": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

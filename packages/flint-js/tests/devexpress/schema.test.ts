@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import { SUPPORTED_VIEW_TYPES, prepareDevExpressPlan } from '../../src/devexpress/artifact';
 
-const schemaPath = resolve(__dirname, '../../../../../schema/flint.devexpress.chart.v1.schema.json');
+const schemaPath = resolve(__dirname, '../../schema/flint.devexpress.chart.v1.schema.json');
 const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
 const validate = new Ajv2020({ strict: true }).compile(schema);
 

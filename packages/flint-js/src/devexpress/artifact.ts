@@ -140,19 +140,10 @@ function validateTypography(value: unknown, what: string): void {
  * Validates an untrusted value as a DevExpress chart plan.
  * This is the trust boundary between model-influenced input and a live control.
  *
- * The checks below mirror `/schema/flint.devexpress.chart.v1.schema.json`
- * field for field — that schema is the cross-language contract, so it, not this
- * file, is the source of truth for what a valid plan is. They are hand-written
- * rather than an ajv run against the schema file for two reasons that are about
- * shipping, not taste: `flint-chart` is a browser-targeted bundle, so a runtime
- * `node:fs` read of a JSON file (which lives outside this package, in the
- * consuming repo's `/schema`) is not available to it, and ajv is a
- * devDependency whose promotion to a runtime dependency would put a JSON-Schema
- * compiler in every consumer's bundle for a fixed, closed object shape.
- *
- * Drift is prevented by test instead: `tests/devexpress/schema.test.ts` runs one
- * corpus of malformed plans through BOTH ajv-against-the-real-schema-file and
- * this function, and fails if the two ever disagree.
+ * The checks below mirror `schema/flint.devexpress.chart.v1.schema.json`,
+ * which ships with this package. `tests/devexpress/schema.test.ts` compiles
+ * that schema with ajv and runs it against the same corpus these hand-written
+ * checks see, so the two cannot drift apart silently.
  *
  * Two deliberate divergences, both in the direction of "reject at least as much
  * as the schema does":
