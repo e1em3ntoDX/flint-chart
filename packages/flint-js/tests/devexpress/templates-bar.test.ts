@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dxGetTemplateDef } from '../../src/devexpress/templates';
+import { splitSeries, splitValues } from '../../src/devexpress/templates/bar';
 import { assembleDevExpressPlan } from '../../src/devexpress/assemble';
 import type { DevExpressChartPlan } from '../../src/devexpress/plan';
 import type { InstantiateContext } from '../../src/core/types';
@@ -277,6 +278,121 @@ describe('Grouped Bar Chart template', () => {
             ],
         }));
         expect(plan.series!.map((s) => s.name).sort()).toEqual(['north', 'south']);
+    });
+});
+
+// §4.7: splitValues coerced values into a Set<string> and returned
+// `[...seen].sort()`, which sorts numerically-valued groups as text
+// ("10" < "100" < "2" < "9"). Legend order, palette assignment and stack
+// order all derive from this order, so a text sort silently scrambles all
+// three for any numeric group.
+describe('splitValues ordering', () => {
+    it('orders numeric groups numerically, not lexicographically', () => {
+        const rows = [2, 9, 10, 100].map((g) => ({ g }));
+        const ctx = context({
+            table: rows,
+            encodings: { g: { field: 'g' } },
+            channelSemantics: { g: { field: 'g', type: 'ordinal' } as never },
+        });
+        expect(splitValues(ctx, 'g')).toEqual(['2', '9', '10', '100']);
+    });
+
+    // Defensive, not a live-bug regression: ChannelSemantics.ordinalSortOrder
+    // is typed `string[]` (core/types.ts:163) and every canonical sequence
+    // core actually hands back is a string array (core/semantic-types.ts:887's
+    // MONTH_NUM is ['1','2',...,'12'], strings, not numbers), so core cannot
+    // supply a non-string order today. This guards against a future core that
+    // widens the type, and proves the `.map(String)` normalization works if
+    // it ever needs to.
+    it('honors a non-string canonical order', () => {
+        const rows = [2, 9, 10].map((g) => ({ g }));
+        const ctx = context({
+            table: rows,
+            encodings: { g: { field: 'g' } },
+            channelSemantics: {
+                g: { field: 'g', type: 'ordinal', ordinalSortOrder: [9, 10, 2] as never } as never,
+            },
+        });
+        // Chosen so a plain lexicographic sort of the unmatched-extras path
+        // ('10','2','9') does NOT coincide with the canonical order — a test
+        // using [10,2,9] would pass even on the buggy code, because that
+        // canonical order happens to equal the lexicographic sort of these
+        // three strings.
+        expect(splitValues(ctx, 'g')).toEqual(['9', '10', '2']);
+    });
+});
+
+// End-to-end reproduction of the external review's exact claim: a Grouped Bar
+// Chart, groups 2/9/10/100, semantic type 'Year'. This channel reaches
+// splitValues (and is not rejected by Task 7's discreteness guard) because
+// core's temporal+ordinal disambiguation (core/decisions.ts's
+// disambiguateMultiEncoding, "Temporal + Ordinal" branch) always resolves
+// through resolveTemporalEncoding regardless of channel, and
+// resolveTemporalEncoding falls back to 'ordinal' when the values don't look
+// like real years (outside 1500-2200) — which 2, 9, 10, 100 are not. An
+// actual calendar-year group (e.g. 2019-2022) instead resolves 'temporal' and
+// gets rejected by resolveSplitChannel, producing a single series — confirmed
+// separately, not asserted here since it is a different (already-passing) path.
+describe('numeric split-series ordering (end-to-end)', () => {
+    it('splits a Year-typed group channel by non-year-like integers, ordered numerically', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [2, 9, 10, 100].map((g) => ({ g, category: `c${g}`, amount: g * 2 })) },
+            semantic_types: { g: 'Year', category: 'Category', amount: 'Quantity' },
+            chart_spec: {
+                chartType: 'Grouped Bar Chart',
+                encodings: { x: { field: 'category' }, y: { field: 'amount' }, group: { field: 'g' } },
+            },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.series.map((s) => s.name)).toEqual(['2', '9', '10', '100']);
+        expect(plan.unsupported).toEqual([]);
+    });
+});
+
+// §4.7 continued: splitSeries built one pivot point per argument in
+// first-appearance (row) order and never consulted the argument channel's
+// canonical order, so a numeric or ordinal argument axis came out unsorted.
+describe('pivot argument ordering', () => {
+    it("orders points by the argument channel's canonical order", () => {
+        const ctx = context({
+            table: [
+                { g: 100, group: 'North', v: 1 },
+                { g: 2, group: 'North', v: 2 },
+                { g: 9, group: 'South', v: 3 },
+                { g: 10, group: 'South', v: 4 },
+            ],
+            encodings: { x: { field: 'g' }, y: { field: 'v' }, group: { field: 'group' } },
+            channelSemantics: {
+                // Non-string, mirroring splitValues' own defensive case.
+                x: { field: 'g', type: 'ordinal', ordinalSortOrder: [10, 2, 9, 100] as never } as never,
+                y: { field: 'v', type: 'quantitative' } as never,
+                group: { field: 'group', type: 'nominal' } as never,
+            },
+        });
+        const { points } = splitSeries(ctx, 'group', 'Bar', true);
+        expect(points!.map((p) => p.g)).toEqual([10, 2, 9, 100]);
+    });
+
+    // Task 5's resolveAxisRoles means the argument channel is not always x:
+    // here x carries the quantitative measure and y carries the (ordinal)
+    // category, so the canonical order that matters lives on
+    // channelSemantics.y, not a hardcoded channelSemantics.x.
+    it('reads the canonical order off whichever channel is the category axis, not x unconditionally', () => {
+        const ctx = context({
+            table: [
+                { g: 100, group: 'North', v: 1 },
+                { g: 2, group: 'North', v: 2 },
+                { g: 9, group: 'South', v: 3 },
+            ],
+            encodings: { x: { field: 'v' }, y: { field: 'g' }, group: { field: 'group' } },
+            channelSemantics: {
+                x: { field: 'v', type: 'quantitative' } as never,
+                y: { field: 'g', type: 'ordinal', ordinalSortOrder: [9, 2, 100] as never } as never,
+                group: { field: 'group', type: 'nominal' } as never,
+            },
+        });
+        const { points } = splitSeries(ctx, 'group', 'Bar', true);
+        expect(points!.map((p) => p.g)).toEqual([9, 2, 100]);
     });
 });
 

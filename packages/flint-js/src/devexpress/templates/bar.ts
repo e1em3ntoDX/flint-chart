@@ -150,18 +150,78 @@ export function resolveSplitChannel(plan: Draft, context: InstantiateContext, ch
 export function splitValues(context: InstantiateContext, channel: string): string[] {
     const field = fieldOf(context, channel);
     if (!field) return [];
-    const ordered = context.channelSemantics[channel]?.ordinalSortOrder;
     const seen = new Set<string>();
     for (const row of context.table) {
         const value = row?.[field];
         if (value != null) seen.add(String(value));
     }
+
+    // Defensive, not a live fix: ChannelSemantics.ordinalSortOrder is typed
+    // `string[]` (core/types.ts:163) and every canonical sequence core hands
+    // back is already a string array (e.g. core/semantic-types.ts:887's
+    // MONTH_NUM), so `ordered` cannot actually be non-string today. The
+    // `.map(String)` only guards against a future core that widens the type —
+    // without it, comparing raw canonical values against `seen` (a
+    // `Set<string>`) would silently empty `known` and fall through to the
+    // lexicographic sort below.
+    const ordered = context.channelSemantics[channel]?.ordinalSortOrder?.map(String);
     if (ordered?.length) {
         const known = ordered.filter((v) => seen.has(v));
-        const extra = [...seen].filter((v) => !ordered.includes(v)).sort();
+        const extra = [...seen].filter((v) => !ordered.includes(v)).sort(compareSplitValues);
         return [...known, ...extra];
     }
-    return [...seen].sort();
+    return [...seen].sort(compareSplitValues);
+}
+
+/**
+ * Default order for split values with no canonical order from core.
+ *
+ * Plain `.sort()` is lexicographic on strings, which puts "100" before "2"
+ * and gets legend order, palette assignment and stack order all wrong for
+ * numeric groups (years, quarters, sizes) — the failure mode the external
+ * review flagged in §4.7. Numeric-first, then locale-aware string collation
+ * for anything that isn't a number.
+ */
+function compareSplitValues(a: string, b: string): number {
+    const na = Number(a);
+    const nb = Number(b);
+    const aNum = a.trim() !== '' && Number.isFinite(na);
+    const bNum = b.trim() !== '' && Number.isFinite(nb);
+    if (aNum && bNum) return na - nb;
+    if (aNum) return -1;
+    if (bNum) return 1;
+    return a.localeCompare(b);
+}
+
+/**
+ * Pivot rows in the argument channel's canonical order.
+ *
+ * splitSeries (below) builds one point per argument in first-appearance
+ * order, which is row order — so a numeric argument axis comes out unsorted
+ * and an ordinal one ignores the order core resolved for it. Deliberately no
+ * numeric fallback for the unmatched case: a quantitative argument axis is
+ * continuous, and dxChart sorts a `Numerical` argument axis itself — imposing
+ * an order on the point array here would only matter for a `Qualitative`
+ * axis, which is the case `ordinalSortOrder` already covers. Rows outside the
+ * canonical order keep their relative row order (stable sort), same as
+ * `rollupCategories`'s `extra` (../transforms.ts:107-111) leaves its
+ * unmatched keys in first-appearance order rather than re-sorting them.
+ */
+function orderPivotPoints(
+    points: Record<string, unknown>[],
+    argumentField: string,
+    ordinalSortOrder: unknown[] | undefined,
+): Record<string, unknown>[] {
+    if (!ordinalSortOrder?.length) return points;
+    const rank = new Map(ordinalSortOrder.map((v, i) => [String(v), i]));
+    return [...points].sort((a, b) => {
+        const ra = rank.get(String(a[argumentField]));
+        const rb = rank.get(String(b[argumentField]));
+        if (ra != null && rb != null) return ra - rb;
+        if (ra != null) return -1;
+        if (rb != null) return 1;
+        return 0;   // both outside the canonical order: keep row order
+    });
 }
 
 function isHorizontal(context: InstantiateContext): boolean {
@@ -241,6 +301,12 @@ export function splitSeries(
     }
 
     const { argumentField, valueFields: [valueField] } = base;
+    // Not channelSemantics.x unconditionally: resolveAxisRoles (Task 5) means
+    // the argument/category channel can be y on a reversed chart, and
+    // argumentField above already came from whichever channel that resolved
+    // to (via baseSeries -> resolveAxisRoles) — the canonical order has to be
+    // read off the same channel or a reversed chart would silently ignore it.
+    const { categoryAxis } = resolveAxisRoles(context);
     const taken = new Set<string>([argumentField]);
     const columnFor = new Map<string, string>();
     for (const value of values) {
@@ -304,7 +370,7 @@ export function splitSeries(
             valueFields: [columnFor.get(value)!],
             labelsVisible,
         })),
-        points,
+        points: orderPivotPoints(points, argumentField, context.channelSemantics[categoryAxis]?.ordinalSortOrder),
         warnings,
     };
 }
