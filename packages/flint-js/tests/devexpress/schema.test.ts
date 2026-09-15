@@ -163,6 +163,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
             (p.diagram.axisY as Record<string, unknown>).labelPrefix = 42;
             return p;
         }],
+        ['an axis labelSuffix that is not a string', () => {
+            const p = validPlan();
+            (p.diagram.axisY as Record<string, unknown>).labelSuffix = 42;
+            return p;
+        }],
         ['an invalid argument scale type', () => {
             const p = validPlan(); p.series[0].argumentScaleType = 'Ordinal'; return p;
         }],

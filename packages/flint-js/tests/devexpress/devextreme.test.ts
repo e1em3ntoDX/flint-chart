@@ -349,7 +349,7 @@ describe('planToDevExtreme', () => {
     // rendered wrong; and the currency prefix core computed for this same field
     // reached point labels via valueFormat but never the axis, so ticks and
     // point labels disagreed on one chart.
-    it('gives the axis an LDML format and keeps the currency prefix', () => {
+    it('gives the axis a DevExtreme format object and keeps the currency prefix', () => {
         const plan = assembleDevExpressPlan(barInput);
         plan.diagram!.axisY.labelFormat = ',.2f';
         plan.diagram!.axisY.labelPrefix = '$';
@@ -387,6 +387,21 @@ describe('planToDevExtreme', () => {
         const valueAxis = options.valueAxis as Record<string, unknown>;
         const label = valueAxis.label as Record<string, unknown> | undefined;
         expect(label?.customizeText).toBeUndefined();
+    });
+
+    // The prefix and suffix branches share one `if`, but only the prefix case
+    // above had runtime coverage. A suffix-only axis (e.g. a unit like "kg")
+    // exercises the same customizeText with an empty prefix, so it needs its
+    // own assertion on the rendered text rather than being inferred from the
+    // prefix case by inspection.
+    it('renders a suffix-only axis label with no leading prefix text', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.diagram!.axisY.labelSuffix = 'kg';
+        const { options } = planToDevExtreme(plan);
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        const label = valueAxis.label as { customizeText: (info: { value: number; valueText: string }) => string };
+        expect(typeof label.customizeText).toBe('function');
+        expect(label.customizeText({ value: 1450, valueText: '1,450' })).toBe('1,450kg');
     });
 
     // End-to-end: a real Price/USD field through the normal assembly pipeline.

@@ -84,6 +84,15 @@ export interface DevExtremeNumberFormat {
  * labels and tooltips, so on such an axis the ticks and the point labels can
  * differ by a trailing ".0". That is narrower than the bug this function
  * fixes (ticks rendering raw d3 syntax outright), but it is real.
+ *
+ * Same admission for the leading `+`: the object form has no sign-forcing
+ * equivalent, so a `+`-prefixed pattern would render without the forced sign
+ * on the axis. Currently unreachable in practice — core only ever populates
+ * `.format` (the axis-bound field) from the currency and 0–1-percent
+ * branches (field-semantics.ts:356, :376), and neither passes `signMode: '+'`
+ * to precisionFormat — but the grammar comment above still lists `+`, so this
+ * function should say plainly that it drops it rather than let a reader
+ * assume it's handled.
  */
 export function patternToDevExtremeFormat(pattern: string): DevExtremeNumberFormat | undefined {
     const useThousandsSeparator = pattern.includes(',');
