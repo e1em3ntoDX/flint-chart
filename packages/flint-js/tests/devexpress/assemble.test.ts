@@ -147,6 +147,30 @@ describe('assembleDevExpressPlan', () => {
         expect(plan.series[0].name).toBe('Net Revenue');
     });
 
+    // §review-5: baseSeries (templates/bar.ts) names the series after the
+    // resolved VALUE channel, which resolveAxisRoles may place on 'x' rather
+    // than 'y'. Reading the override off literal 'y' would name the series
+    // after the CATEGORY field instead whenever the axes are reversed — axis
+    // titles are unaffected (they're keyed by physical channel, correctly),
+    // only the series name (legend, tooltip format lookup) goes wrong.
+    it('overrides a single series name off the resolved value channel, even when it lands on x', () => {
+        const plan = assembleDevExpressPlan({
+            data: {
+                values: [
+                    { revenue: 100, region: 'North' },
+                    { revenue: 250, region: 'South' },
+                ],
+            },
+            semantic_types: { revenue: 'Price', region: 'Country' },
+            chart_spec: {
+                chartType: 'Bar Chart',
+                encodings: { x: { field: 'revenue' }, y: { field: 'region' } },
+            },
+            field_display_names: { revenue: 'Revenue!!', region: 'Region!!' },
+        } as never);
+        expect(plan.series[0].name).toBe('Revenue!!');
+    });
+
     it('does not override a split series name, since it is a raw category value, not a field name', () => {
         const plan = assembleDevExpressPlan({
             ...input({
@@ -580,7 +604,7 @@ describe('zero baseline handed to core', () => {
         // core calls that "not debatable" (core/semantic-types.ts:469) and
         // vegalite/assemble.ts:300-318 gates the same override on a
         // position-cognitive mark. Bar Chart is `markCognitiveChannel:
-        // 'length'` (templates/bar.ts:261), so the override must be ignored.
+        // 'length'` (templates/bar.ts:413), so the override must be ignored.
         const plan = assembleDevExpressPlan(input({
             chartProperties: { includeZero_y: false },
         }), { target: 'devextreme' });

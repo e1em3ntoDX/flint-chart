@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { binHistogram, rollupCategories } from '../../src/devexpress/transforms';
+import type { ChartWarning } from '../../src/core/types';
 
 describe('binHistogram', () => {
     it('bins values into labelled buckets with counts', () => {
@@ -87,5 +88,32 @@ describe('rollupCategories', () => {
     it('skips rows whose category value is null or undefined', () => {
         const rows = [{ region: null, sales: 5 }, { region: 'North', sales: 10 }];
         expect(rollupCategories(rows, 'region', 'sales')).toEqual([{ region: 'North', sales: 10 }]);
+    });
+
+    it('does not require a warnings sink and does not throw without one', () => {
+        const rows = [{ region: null, sales: 5 }, { region: 'North', sales: 10 }];
+        expect(() => rollupCategories(rows, 'region', 'sales')).not.toThrow();
+    });
+
+    it('reports the dropped-row count into an optional warnings sink', () => {
+        const rows = [
+            { region: null, sales: 5 },
+            { region: undefined, sales: 3 },
+            { region: 'North', sales: 10 },
+        ];
+        const warnings: ChartWarning[] = [];
+        rollupCategories(rows, 'region', 'sales', undefined, warnings);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0].code).toBe('category-rollup-null-dropped');
+        expect(warnings[0].severity).toBe('info');
+        expect(warnings[0].field).toBe('region');
+        expect(warnings[0].message).toContain('2 rows');
+    });
+
+    it('does not push a warning to the sink when no rows are dropped', () => {
+        const rows = [{ region: 'North', sales: 10 }];
+        const warnings: ChartWarning[] = [];
+        rollupCategories(rows, 'region', 'sales', undefined, warnings);
+        expect(warnings).toHaveLength(0);
     });
 });

@@ -69,14 +69,14 @@ describe('resolveLabelFormat', () => {
         expect(resolveLabelFormat({ format: { pattern: '0.0%' } } as never)).toBe('0.0%');
     });
 
-    // Reconciliation (docs/devexpress-core-api-notes.md): the real capture never
-    // populated `.format` (only `.tooltipFormat`, out of scope for this
-    // reader) — but the FormatSpec shape it and `.format` share, per
-    // field-semantics.ts:69, is
-    // `{ pattern?: string; prefix?: string; suffix?: string; abbreviate?: boolean }`.
-    // `pattern` is already first in the candidate list; this asserts against
-    // the full real shape (all optional keys present) rather than a
-    // minimal `{ pattern }` fixture.
+    // Reconciliation (docs/devexpress-core-api-notes.md): core DOES populate
+    // `.format`, in two real cases — currency with a known symbol
+    // (core/field-semantics.ts:356, `{ pattern: ',.2f', prefix: '$' }`) and a
+    // 0–1 percent with an intrinsicDomain (:376, `{ pattern: '.N~%' }`). Its
+    // shape is the real `FormatSpec = { pattern?; prefix?; suffix?;
+    // abbreviate? }` (field-semantics.ts:89), and `pattern` is checked first.
+    // This asserts against the full real shape (all optional keys present)
+    // rather than a minimal `{ pattern }` fixture.
     it('reads the real FormatSpec shape, with prefix/suffix/abbreviate also present', () => {
         const format = { pattern: ',.2f', prefix: '$', suffix: 'k', abbreviate: true };
         expect(resolveLabelFormat({ format } as never)).toBe(',.2f');

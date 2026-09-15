@@ -19,12 +19,13 @@ function lineViewType(context: InstantiateContext): string {
 
 const lineChart: DxTemplateDef = {
     chart: 'Line Chart',
-    // `template.mark: 'line'` is read by markTypeOf (devexpress/assemble.ts:60)
+    // `template.mark: 'line'` is read by markTypeOf (devexpress/assemble.ts:53)
     // before it falls back to the markCognitiveChannel ('position') mapping.
     // Without it, computeZeroDecision would treat a Line Chart as a scatter/point
     // mark, wrongly defaulting includeZero to false on zero-meaningful data
     // (e.g. a revenue line chart) — diverging from Flint's own core line branch
-    // and its vegalite Line Chart template (vegalite/templates/line.ts:91), both
+    // (core/semantic-types.ts:488, the position-mark case) and its vegalite
+    // Line Chart template (vegalite/templates/line.ts:118, `mark: "line"`), both
     // of which get includeZero: true for the same case.
     template: { mark: 'line' },
     channels: ['x', 'y', 'color', 'strokeDash', 'detail', 'opacity'],
@@ -33,7 +34,11 @@ const lineChart: DxTemplateDef = {
     targets: ['devextreme', 'xtracharts'],
     markCognitiveChannel: 'position',
     instantiate(spec: Draft, context: InstantiateContext) {
-        // Line charts are never rotated: Flint omits the transpose operator for them.
+        // Line Chart itself never requests rotation (unlike Bar Chart's
+        // isHorizontal(), there is no horizontal-orient option here) — but
+        // applyCartesianFrame still ORs in `categoryAxis === 'y'`, so the
+        // projected plan DOES come out rotated:true whenever a discrete y
+        // lands the category on that axis.
         const hasColor = resolveSplitChannel(spec, context, 'color');
         applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
         const viewType = lineViewType(context);

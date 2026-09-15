@@ -116,12 +116,27 @@ const histogram: DxTemplateDef = {
         // the count field is known. Spread the existing axis object (rather
         // than replacing spec.diagram wholesale) so argumentAxisChannel,
         // which applyCartesianFrame just set, survives.
-        const { valueAxis } = resolveAxisRoles(binnedContext);
+        const { categoryAxis, valueAxis } = resolveAxisRoles(binnedContext);
         const axisKey = valueAxis === 'x' ? 'axisX' : 'axisY';
         spec.diagram![axisKey] = {
             ...spec.diagram![axisKey],
             title: 'Count',
             includeZero: true,
+        };
+        // The argument axis's channel semantics still describe the
+        // PRE-BINNING quantitative field (binnedContext only swaps `table`,
+        // not `channelSemantics`), so axis() upstream in applyCartesianFrame
+        // may have set a numeric labelFormat or a currency labelPrefix/
+        // labelSuffix from it. But the values this axis actually renders are
+        // `bin`, the pre-formatted string labels binHistogram already
+        // produced (e.g. "100–107") — reformatting or re-affixing them would
+        // print "$100–107". Clear all three so the bin strings render as-is.
+        const argumentAxisKey = categoryAxis === 'x' ? 'axisX' : 'axisY';
+        spec.diagram![argumentAxisKey] = {
+            ...spec.diagram![argumentAxisKey],
+            labelFormat: undefined,
+            labelPrefix: undefined,
+            labelSuffix: undefined,
         };
         spec.series = [{
             name: 'Count',

@@ -136,6 +136,22 @@ describe('planToDevExtreme', () => {
         expect((argumentAxis.grid as Record<string, unknown>).visible).toBe(false);
     });
 
+    // §review-1: a plan missing argumentAxisChannel (predates its introduction,
+    // or was hand-authored) must fail open onto the conventional x-argument
+    // layout rather than silently inverting every role. `=== 'x'` would have
+    // done the opposite: absent/undefined is not 'x', so it would have routed
+    // axisY as the argument for every plan lacking the field.
+    it('falls back to the conventional x-argument layout when argumentAxisChannel is absent', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        delete (plan.diagram as { argumentAxisChannel?: 'x' | 'y' }).argumentAxisChannel;
+
+        const { options } = planToDevExtreme(plan);
+        const argumentAxis = options.argumentAxis as Record<string, unknown>;
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        expect(argumentAxis.title).toBe('Quarter');
+        expect(valueAxis.title).toBe('Revenue');
+    });
+
     // End-to-end guard for the multi-series defect: the dxChart options must
     // give every series a DIFFERENT valueField over a wide-format dataSource.
     // Identical valueFields over a shared long-format dataSource is exactly the
@@ -431,5 +447,28 @@ describe('planToDevExtreme', () => {
         expect(tickReading).toBe('$1,234.50');
         expect(pointReading).toBe('$1,234.50');
         expect(tickReading).toBe(pointReading);
+    });
+
+    // §review-4: a Histogram's argument axis renders `bin`, the pre-formatted
+    // string range labels binHistogram already produced (e.g. "100–107") —
+    // but the channel semantics feeding applyCartesianFrame's axis() still
+    // describe the PRE-BINNING quantitative field (binnedContext only swaps
+    // `table`, not `channelSemantics`). For a currency field that used to
+    // leak the '$' prefix onto those string labels; point.ts's Histogram
+    // instantiate now clears labelFormat/labelPrefix/labelSuffix on the
+    // argument axis specifically to prevent that.
+    it('does not carry the pre-binning currency prefix onto the histogram argument axis', () => {
+        const rows = Array.from({ length: 40 }, (_, i) => ({ price: 100 + (i % 25) }));
+        const plan = assembleDevExpressPlan({
+            data: { values: rows },
+            semantic_types: { price: { semanticType: 'Price', unit: 'USD' } },
+            chart_spec: { chartType: 'Histogram', encodings: { x: { field: 'price' } } },
+        } as never);
+
+        const { options } = planToDevExtreme(plan);
+        const argumentAxis = options.argumentAxis as Record<string, unknown>;
+        const label = argumentAxis.label as Record<string, unknown> | undefined;
+        expect(label?.customizeText).toBeUndefined();
+        expect(label?.format).toBeUndefined();
     });
 });

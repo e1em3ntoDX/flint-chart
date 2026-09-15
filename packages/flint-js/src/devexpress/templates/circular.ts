@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import type { InstantiateContext } from '../../core/types';
+import type { ChartWarning, InstantiateContext } from '../../core/types';
 import type { DevExpressChartPlan } from '../plan';
 import { fieldOf, humanizeFieldName } from './bar';
 import { resolveTooltipFormat } from '../semantics-bridge';
@@ -24,12 +24,17 @@ function applyCircularFrame(spec: Draft, context: InstantiateContext, viewType: 
     // dxPieChart draws one sector per point; collapse repeated categories
     // (see rollupCategories in ../transforms) so two rows for the same
     // category sum into one slice instead of drawing twice.
+    const rollupWarnings: ChartWarning[] = [];
     spec.data = {
         points: rollupCategories(
             context.table, argumentField, valueField,
             context.channelSemantics.color?.ordinalSortOrder,
+            rollupWarnings,
         ),
     };
+    if (rollupWarnings.length > 0) {
+        spec.warnings = [...(spec.warnings ?? []), ...rollupWarnings];
+    }
     spec.diagram = null;
     spec.legend = { visible: true, position: 'right' };
     spec.series = [{

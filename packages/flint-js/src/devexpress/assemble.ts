@@ -20,9 +20,10 @@ import { pickDevExpressPalette } from './colormap';
 import {
     DEVEXPRESS_PLAN_SCHEMA, type DevExpressChartPlan, type RenderTarget, type TypographyPlan,
 } from './plan';
-import { resolveTypeRole } from './typography';
 import { resolveDivergingScheme, resolvePaletteClass } from './semantics-bridge';
 import { assertNoFacets, assertRequiredChannels, dxGetTemplateDef, type DxTemplateDef } from './templates';
+import { resolveAxisRoles } from './templates/bar';
+import { resolveTypeRole } from './typography';
 
 export interface AssembleDevExpressOptions {
     target?: RenderTarget;
@@ -174,9 +175,9 @@ function runCoreStages(
     }
 
     // ── PHASE 0: semantics ───────────────────────────────────────────────
-    // convertTemporalData (core/resolve-semantics.ts:242) MUST run first: its
+    // convertTemporalData (core/resolve-semantics.ts:259) MUST run first: its
     // output is the 4th argument of resolveChannelSemantics
-    // (core/resolve-semantics.ts:310), so temporal format detection sees
+    // (core/resolve-semantics.ts:332), so temporal format detection sees
     // canonicalized values. Cf. vegalite/assemble.ts:280-285.
     const convertedData = convertTemporalData(data, semanticTypes);
     const channelSemantics = resolveChannelSemantics(
@@ -251,8 +252,8 @@ function runCoreStages(
 
     // ── STEP 0c: budgets → overflow filtering ────────────────────────────
     // Fixed order (docs/devexpress-core-api-notes.md): computeChannelBudgets
-    // (core/compute-layout.ts:1310) → filterOverflow (core/filter-overflow.ts:54)
-    // → computeLayout (core/compute-layout.ts:264). Faceting is rejected before
+    // (core/compute-layout.ts:1431) → filterOverflow (core/filter-overflow.ts:54)
+    // → computeLayout (core/compute-layout.ts:284). Faceting is rejected before
     // we get here, so budgets.facetGrid is always undefined.
     const budgets = computeChannelBudgets(
         channelSemantics, declaration, convertedData, canvasSize, effectiveOptions,
@@ -369,8 +370,14 @@ function applyFieldDisplayNames(
         const sizeOverride = overrideFor(fieldOfChannel('size'));
         if (sizeOverride && draft.series?.[0]) draft.series[0].name = sizeOverride;
     } else if (draft.series && draft.series.length === 1 && !fieldOfChannel('y2')) {
-        const yOverride = overrideFor(fieldOfChannel('y'));
-        if (yOverride) draft.series[0].name = yOverride;
+        // baseSeries (templates/bar.ts) names the series after the resolved
+        // VALUE channel, which resolveAxisRoles may place on 'x' rather than
+        // 'y' (e.g. a bar chart with x:measure, y:category). Reading the
+        // override off literal 'y' would silently name the series after the
+        // wrong field whenever the axes are reversed.
+        const { valueAxis } = resolveAxisRoles(context);
+        const valueOverride = overrideFor(fieldOfChannel(valueAxis));
+        if (valueOverride) draft.series[0].name = valueOverride;
     }
 }
 

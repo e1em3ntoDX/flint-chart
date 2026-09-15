@@ -218,8 +218,12 @@ export function planToDevExtreme(plan: DevExpressChartPlan): DevExtremeProjectio
     // orient:'horizontal' request with the category still on x, and a
     // category genuinely detected on y). So route by the plan's explicit
     // argumentAxisChannel rather than assuming axisX is always the argument.
-    const argumentAxisPlan = diagram.argumentAxisChannel === 'x' ? diagram.axisX : diagram.axisY;
-    const valueAxisPlan = diagram.argumentAxisChannel === 'x' ? diagram.axisY : diagram.axisX;
+    // Test `=== 'y'` (not `=== 'x'`): an absent or unrecognised value must
+    // fall back to the conventional x-argument layout, which is both
+    // backward compatible with plans predating this field and the safe
+    // default — failing open as 'x' rather than silently inverting roles.
+    const argumentAxisPlan = diagram.argumentAxisChannel === 'y' ? diagram.axisY : diagram.axisX;
+    const valueAxisPlan = diagram.argumentAxisChannel === 'y' ? diagram.axisX : diagram.axisY;
     return {
         component: 'dxChart',
         options: {

@@ -428,4 +428,27 @@ describe('Pie and Donut templates', () => {
         ));
         expect(plan.data!.points.map((p) => (p as { region: string }).region)).toEqual(['North', 'South']);
     });
+
+    // §review-8: rollupCategories drops any row whose category is null — a
+    // silent row loss unless something reports it. The plan must surface a
+    // warning naming how many rows were dropped, the way splitSeries already
+    // reports its own row collapse (series-split-aggregated).
+    it('warns how many rows were dropped for a null category, rather than dropping them silently', () => {
+        const def = dxGetTemplateDef('Pie Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, circularContext('Pie Chart', [
+            { region: 'North', revenue: 10 },
+            { region: null, revenue: 5 },
+            { region: undefined, revenue: 7 },
+            { region: 'South', revenue: 20 },
+        ]));
+        expect(plan.data!.points).toEqual([
+            { region: 'North', revenue: 10 },
+            { region: 'South', revenue: 20 },
+        ]);
+        const warning = plan.warnings!.find((w) => w.code === 'category-rollup-null-dropped');
+        expect(warning).toBeDefined();
+        expect(warning!.message).toContain('2 rows');
+        expect(warning!.field).toBe('region');
+    });
 });

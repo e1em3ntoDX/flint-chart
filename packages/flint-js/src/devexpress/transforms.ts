@@ -9,6 +9,8 @@
  * the compiler materialises buckets while it still holds the rows.
  */
 
+import type { ChartWarning } from '../core/types';
+
 export interface HistogramBin extends Record<string, unknown> {
     bin: string;
     binStart: number;
@@ -83,17 +85,27 @@ export function binHistogram(
  * (core/resolve-semantics.ts:474-482 infers it from the field's semantic type,
  * e.g. Month/Day/Quarter — it is never read off the encoding), then first
  * appearance for anything outside it.
+ *
+ * A row whose category is null/undefined is dropped rather than rolled up —
+ * there is no sector to attribute it to. That row loss is otherwise silent,
+ * so an optional `warnings` sink lets a caller (circular.ts) report how many
+ * rows were dropped, the same way splitSeries reports its own row collapse
+ * via the `series-split-aggregated` warning. Omitting it keeps every existing
+ * caller and test byte-for-byte compatible — this does not change the
+ * drop itself, or the empty-result behaviour when every row is dropped.
  */
 export function rollupCategories(
     rows: Record<string, unknown>[],
     categoryField: string,
     valueField: string,
     ordinalSortOrder?: string[],
+    warnings?: ChartWarning[],
 ): Record<string, unknown>[] {
     const totals = new Map<string, { row: Record<string, unknown>; total: number }>();
+    let droppedNullCategory = 0;
     for (const row of rows) {
         const raw = row?.[categoryField];
-        if (raw == null) continue;
+        if (raw == null) { droppedNullCategory += 1; continue; }
         const key = String(raw);
         const value = Number(row[valueField]);
         const entry = totals.get(key);
@@ -102,6 +114,18 @@ export function rollupCategories(
         } else {
             totals.set(key, { row, total: Number.isFinite(value) ? value : 0 });
         }
+    }
+
+    if (droppedNullCategory > 0 && warnings) {
+        warnings.push({
+            severity: 'info',
+            code: 'category-rollup-null-dropped',
+            message:
+                `${droppedNullCategory} row${droppedNullCategory === 1 ? '' : 's'} had a null ` +
+                `${categoryField} and were dropped before rolling up into sectors.`,
+            channel: 'color',
+            field: categoryField,
+        });
     }
 
     const keys = [...totals.keys()];
