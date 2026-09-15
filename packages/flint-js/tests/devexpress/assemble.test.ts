@@ -613,3 +613,43 @@ describe('PHASE 0 scale-type overrides', () => {
         expect(plan.series[0].argumentScaleType).toBe('Qualitative');
     });
 });
+
+describe('assembleDevExpressPlan Histogram', () => {
+    it('anchors the histogram value axis to zero and titles it Count', () => {
+        const rows = Array.from({ length: 40 }, (_, i) => ({ mpg: 10 + (i % 25) }));
+        const plan = assembleDevExpressPlan({
+            data: { values: rows },
+            semantic_types: { mpg: 'Quantity' },
+            chart_spec: { chartType: 'Histogram', encodings: { x: { field: 'mpg' } } },
+        } as ChartAssemblyInput);
+
+        const valueAxis = plan.diagram!.axisY;
+        expect(valueAxis.includeZero).toBe(true);
+        expect(valueAxis.title).toBe('Count');
+        expect(plan.series[0].valueFields).toEqual(['count']);
+        // Every row is accounted for, none lost to overflow filtering.
+        expect(plan.data.points.reduce((s: number, p: any) => s + p.count, 0)).toBe(40);
+    });
+
+    it('bins the pre-overflow-filtered table when x is truncated by filterOverflow', () => {
+        // Reachability check for the fullTable fix: filterOverflow only
+        // truncates x/y when the channel's effective type is discrete
+        // (core/filter-overflow.ts:110: `isDiscreteType`), so an ordinal
+        // override on a 500-unique-value numeric field forces a real
+        // truncation — proven independently by binding the same shape without
+        // the override, which drops the warning and reports the full 500.
+        const rows = Array.from({ length: 500 }, (_, i) => ({ mpg: i }));
+        const truncatedInput = {
+            data: { values: rows },
+            semantic_types: { mpg: 'Quantity' },
+            chart_spec: { chartType: 'Histogram', encodings: { x: { field: 'mpg', type: 'ordinal' } } },
+        } as ChartAssemblyInput;
+
+        const plan = assembleDevExpressPlan(truncatedInput);
+        // filterOverflow really did truncate x — this is the same mechanism
+        // the fix routes around by reading fullTable instead of table.
+        expect(plan.warnings!.some((w) => w.code === 'overflow' && w.field === 'mpg')).toBe(true);
+        const total = plan.data.points.reduce((s: number, p: any) => s + p.count, 0);
+        expect(total).toBe(500);
+    });
+});

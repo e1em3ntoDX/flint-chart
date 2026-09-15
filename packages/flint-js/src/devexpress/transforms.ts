@@ -23,6 +23,11 @@ function formatBound(value: number): string {
 export function binHistogram(
     rows: Record<string, unknown>[],
     field: string,
+    // Sturges-style ceil(sqrt(n)), capped at 20. This is a backend-local rule
+    // by necessity, not by preference: ChannelSemantics.binningSuggested
+    // (core/types.ts:177) is a boolean — core says whether to bin, never into
+    // how many buckets — so there is no core decision to defer to. Revisit if
+    // core ever grows a bin-count signal.
     maxBins = 20,
 ): HistogramBin[] {
     const values = rows
@@ -30,8 +35,16 @@ export function binHistogram(
         .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     if (values.length === 0) return [];
 
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    // Not Math.min(...values)/Math.max(...values): spreading the array onto
+    // the call stack throws RangeError past V8's argument-count limit
+    // (~65536-125000), a real ceiling given the MCP guide recommends a local
+    // server precisely "for large datasets".
+    let min = values[0];
+    let max = values[0];
+    for (const value of values) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+    }
     if (min === max) {
         return [{
             bin: formatBound(min), binStart: min, binEnd: min, count: values.length,

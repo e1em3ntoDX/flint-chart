@@ -29,4 +29,14 @@ describe('binHistogram', () => {
     it('returns an empty array for no numeric input', () => {
         expect(binHistogram([{ v: null }], 'v', 5)).toEqual([]);
     });
+
+    it('handles an array larger than the argument-spread limit', () => {
+        // Math.min(...values)/Math.max(...values) throws RangeError past V8's
+        // ~65536-125000 call-argument limit, which a 200k-row table exceeds by
+        // a comfortable margin without shrinking below that ceiling.
+        const rows = Array.from({ length: 200_000 }, (_, i) => ({ v: i % 1000 }));
+        expect(() => binHistogram(rows, 'v')).not.toThrow();
+        const bins = binHistogram(rows, 'v');
+        expect(bins.reduce((sum, b) => sum + b.count, 0)).toBe(200_000);
+    }, 20_000);
 });

@@ -254,6 +254,58 @@ describe('Histogram template', () => {
         }));
         expect(plan.series![0].name).toBe('Count');
     });
+
+    it('anchors the value axis to zero and titles it Count', () => {
+        // Histogram declares only channel x, so the shared frame's value axis
+        // (axisY here — the bins are the argument, on x) had no channel
+        // semantics to read: untitled, includeZero:false. That unanchors the
+        // bars from zero and breaks bar-height-proportional-to-frequency.
+        const def = dxGetTemplateDef('Histogram', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Histogram',
+            channelSemantics: { x: { field: 'v', type: 'quantitative' } as never },
+            encodings: { x: { field: 'v' } },
+            table: [{ v: 1 }, { v: 2 }, { v: 8 }, { v: 9 }],
+        }));
+        expect(plan.diagram!.axisY.includeZero).toBe(true);
+        expect(plan.diagram!.axisY.title).toBe('Count');
+    });
+
+    it('preserves argumentAxisChannel set by applyCartesianFrame through the value-axis fixup', () => {
+        // The value-axis correction mutates spec.diagram after
+        // applyCartesianFrame has already populated it; it must merge into the
+        // existing axis object and diagram, not replace either wholesale, or
+        // argumentAxisChannel silently disappears from the plan.
+        const def = dxGetTemplateDef('Histogram', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Histogram',
+            channelSemantics: { x: { field: 'v', type: 'quantitative' } as never },
+            encodings: { x: { field: 'v' } },
+            table: [{ v: 1 }, { v: 2 }],
+        }));
+        expect(plan.diagram!.argumentAxisChannel).toBe('x');
+    });
+
+    it('bins the unfiltered fullTable, not the overflow-filtered table', () => {
+        // filterOverflow (core/filter-overflow.ts) may have already dropped
+        // rows from `table` to fit the canvas; binning that truncated table
+        // would silently distort the distribution. `context.fullTable` is the
+        // pre-filtering table (assemble.ts:287: `fullTable: data`).
+        const def = dxGetTemplateDef('Histogram', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, context({
+            chartType: 'Histogram',
+            channelSemantics: { x: { field: 'v', type: 'quantitative' } as never },
+            encodings: { x: { field: 'v' } },
+            // Simulates overflow filtering having already dropped 2 of 4 rows.
+            table: [{ v: 1 }, { v: 2 }],
+            fullTable: [{ v: 1 }, { v: 2 }, { v: 8 }, { v: 9 }],
+        }));
+        const total = plan.data!.points.reduce((sum, p) => sum + (p as { count: number }).count, 0);
+        expect(total).toBe(4);
+    });
 });
 
 describe('Candlestick Chart template', () => {

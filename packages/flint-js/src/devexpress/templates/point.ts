@@ -97,9 +97,32 @@ const histogram: DxTemplateDef = {
     markCognitiveChannel: 'length',
     instantiate(spec: Draft, context: InstantiateContext) {
         const field = fieldOf(context, 'x')!;
-        const bins = binHistogram(context.table, field);
+        // fullTable, not table: filterOverflow may have dropped values to fit
+        // the canvas (core/filter-overflow.ts), and a histogram binned over a
+        // truncated table reports a distorted distribution with nothing said
+        // about it. fullTable is the pre-filtering table for exactly this
+        // (core/types.ts:480-492, "Templates that need an honest view of the
+        // raw data").
+        const source = context.fullTable ?? context.table;
+        const bins = binHistogram(source, field);
         const binnedContext: InstantiateContext = { ...context, table: bins };
         applyCartesianFrame(spec, binnedContext, { rotated: false, legend: false });
+        // Histogram declares only channel x, so applyCartesianFrame's value
+        // axis (axisY here — resolveAxisRoles puts the bin labels on x as the
+        // category, count on y as the value) had no channel semantics to
+        // read: it came out untitled with includeZero:false, which unanchors
+        // the bars from zero and breaks the one invariant a histogram has —
+        // bar height proportional to frequency. Set it explicitly here, where
+        // the count field is known. Spread the existing axis object (rather
+        // than replacing spec.diagram wholesale) so argumentAxisChannel,
+        // which applyCartesianFrame just set, survives.
+        const { valueAxis } = resolveAxisRoles(binnedContext);
+        const axisKey = valueAxis === 'x' ? 'axisX' : 'axisY';
+        spec.diagram![axisKey] = {
+            ...spec.diagram![axisKey],
+            title: 'Count',
+            includeZero: true,
+        };
         spec.series = [{
             name: 'Count',
             viewType: 'Bar',
