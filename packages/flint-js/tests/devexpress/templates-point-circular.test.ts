@@ -359,14 +359,19 @@ describe('Candlestick Chart template', () => {
 });
 
 describe('Pie and Donut templates', () => {
-    const circularContext = (chartType: string) => context({
+    const circularContext = (
+        chartType: string,
+        table: Record<string, unknown>[] = [{ region: 'North', revenue: 10 }, { region: 'South', revenue: 20 }],
+        channelSemanticsOverrides: Partial<InstantiateContext['channelSemantics']> = {},
+    ) => context({
         chartType,
         channelSemantics: {
             color: { field: 'region', type: 'nominal' } as never,
             size: { field: 'revenue', type: 'quantitative' } as never,
+            ...channelSemanticsOverrides,
         },
         encodings: { color: { field: 'region' }, size: { field: 'revenue' } },
-        table: [{ region: 'North', revenue: 10 }, { region: 'South', revenue: 20 }],
+        table,
     });
 
     it('emits a Circular family plan with no diagram', () => {
@@ -393,5 +398,34 @@ describe('Pie and Donut templates', () => {
         const plan = draft();
         def.instantiate(plan, circularContext('Pie Chart'));
         expect(plan.series![0].name).toBe('Revenue');
+    });
+
+    // dxPieChart draws one sector per point handed to it; without a rollup,
+    // two rows sharing a category draw as two same-named sectors instead of
+    // one combined one (a real difference from the ECharts template, which
+    // collapses duplicates explicitly — echarts/templates/pie.ts:37).
+    it('collapses duplicate categories into one slice with summed values', () => {
+        const def = dxGetTemplateDef('Pie Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, circularContext('Pie Chart', [
+            { region: 'North', revenue: 10 },
+            { region: 'North', revenue: 15 },
+            { region: 'South', revenue: 20 },
+        ]));
+        expect(plan.data!.points).toEqual([
+            { region: 'North', revenue: 25 },
+            { region: 'South', revenue: 20 },
+        ]);
+    });
+
+    it('orders slices by the color channel ordinal order when one is supplied', () => {
+        const def = dxGetTemplateDef('Pie Chart', 'devextreme')!;
+        const plan = draft();
+        def.instantiate(plan, circularContext(
+            'Pie Chart',
+            [{ region: 'South', revenue: 20 }, { region: 'North', revenue: 10 }],
+            { color: { field: 'region', type: 'nominal', ordinalSortOrder: ['North', 'South'] } as never },
+        ));
+        expect(plan.data!.points.map((p) => (p as { region: string }).region)).toEqual(['North', 'South']);
     });
 });

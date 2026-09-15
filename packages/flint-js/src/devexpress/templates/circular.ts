@@ -7,6 +7,7 @@ import type { DevExpressChartPlan } from '../plan';
 import { fieldOf, humanizeFieldName } from './bar';
 import { resolveTooltipFormat } from '../semantics-bridge';
 import { registerTemplate, type DxTemplateDef } from './index';
+import { rollupCategories } from '../transforms';
 
 type Draft = Partial<DevExpressChartPlan>;
 
@@ -20,7 +21,15 @@ function applyCircularFrame(spec: Draft, context: InstantiateContext, viewType: 
     spec.family = 'Circular';
     spec.chartType = context.chartType;
     spec.dataMode = 'materialized';
-    spec.data = { points: context.table };
+    // dxPieChart draws one sector per point; collapse repeated categories
+    // (see rollupCategories in ../transforms) so two rows for the same
+    // category sum into one slice instead of drawing twice.
+    spec.data = {
+        points: rollupCategories(
+            context.table, argumentField, valueField,
+            context.channelSemantics.color?.ordinalSortOrder,
+        ),
+    };
     spec.diagram = null;
     spec.legend = { visible: true, position: 'right' };
     spec.series = [{

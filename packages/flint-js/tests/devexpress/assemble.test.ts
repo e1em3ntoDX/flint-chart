@@ -264,6 +264,52 @@ describe('assembleDevExpressPlan aggregation', () => {
         expect(byRegionDerived.South).toBe(450);
     });
 
+    // Regression coverage for the circular-only rollup: without `aggregate`
+    // set on the channel, nothing upstream of the Pie Chart template ever
+    // collapses duplicate categories — dxPieChart drew two "North" sectors
+    // (10 and 15) instead of one at 25.
+    it('collapses duplicate categories into one slice with summed values even when `aggregate` is not set', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [
+                { region: 'North', sales: 10 },
+                { region: 'North', sales: 15 },
+                { region: 'South', sales: 20 },
+            ] },
+            semantic_types: { region: 'Country', sales: 'Quantity' },
+            chart_spec: {
+                chartType: 'Pie Chart',
+                encodings: { color: { field: 'region' }, size: { field: 'sales' } },
+            },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.data!.points).toEqual([
+            { region: 'North', sales: 25 },
+            { region: 'South', sales: 20 },
+        ]);
+    });
+
+    // core infers `ordinalSortOrder` from the field's semantic type — it is
+    // never read off the encoding (core/resolve-semantics.ts:474-482) — so
+    // this proves the real inference path reaches the plan, not a value this
+    // test hands in itself. 'Month' is one of the few semantic types with a
+    // canonical sequence (core/semantic-types.ts's ORDINAL_SEQUENCES).
+    it('orders slices by the core-inferred calendar-month order, not first appearance', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [
+                { month: 'March', sales: 30 },
+                { month: 'January', sales: 10 },
+                { month: 'February', sales: 20 },
+            ] },
+            semantic_types: { month: 'Month', sales: 'Quantity' },
+            chart_spec: {
+                chartType: 'Pie Chart',
+                encodings: { color: { field: 'month' }, size: { field: 'sales' } },
+            },
+        } as never, { target: 'devextreme' });
+
+        expect(plan.data!.points.map((p: any) => p.month)).toEqual(['January', 'February', 'March']);
+    });
+
     it('leaves an already one-row-per-category Pie Chart unaffected when `aggregate` is not set (no-op)', () => {
         const preAggregated: ChartAssemblyInput = {
             data: {

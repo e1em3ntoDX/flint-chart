@@ -69,3 +69,52 @@ export function binHistogram(
     }
     return bins;
 }
+
+/**
+ * One row per category, values summed.
+ *
+ * A circular plan's points map one-to-one onto sectors: dxPieChart draws a
+ * separate slice for every row it is given, so two rows for the same category
+ * become two same-named slices rather than one combined one. Cartesian families
+ * do not need this — an axis re-uses its category — which is why the rollup
+ * lives on the circular path only.
+ *
+ * Order follows the channel's canonical ordinal order where core supplies one
+ * (core/resolve-semantics.ts:474-482 infers it from the field's semantic type,
+ * e.g. Month/Day/Quarter — it is never read off the encoding), then first
+ * appearance for anything outside it.
+ */
+export function rollupCategories(
+    rows: Record<string, unknown>[],
+    categoryField: string,
+    valueField: string,
+    ordinalSortOrder?: string[],
+): Record<string, unknown>[] {
+    const totals = new Map<string, { row: Record<string, unknown>; total: number }>();
+    for (const row of rows) {
+        const raw = row?.[categoryField];
+        if (raw == null) continue;
+        const key = String(raw);
+        const value = Number(row[valueField]);
+        const entry = totals.get(key);
+        if (entry) {
+            entry.total += Number.isFinite(value) ? value : 0;
+        } else {
+            totals.set(key, { row, total: Number.isFinite(value) ? value : 0 });
+        }
+    }
+
+    const keys = [...totals.keys()];
+    if (ordinalSortOrder?.length) {
+        const canonical = ordinalSortOrder.map(String);
+        const known = canonical.filter((k) => totals.has(k));
+        const extra = keys.filter((k) => !canonical.includes(k));
+        keys.length = 0;
+        keys.push(...known, ...extra);
+    }
+
+    return keys.map((key) => {
+        const { row, total } = totals.get(key)!;
+        return { ...row, [valueField]: total };
+    });
+}

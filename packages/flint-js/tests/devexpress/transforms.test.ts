@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { binHistogram } from '../../src/devexpress/transforms';
+import { binHistogram, rollupCategories } from '../../src/devexpress/transforms';
 
 describe('binHistogram', () => {
     it('bins values into labelled buckets with counts', () => {
@@ -39,4 +39,53 @@ describe('binHistogram', () => {
         const bins = binHistogram(rows, 'v');
         expect(bins.reduce((sum, b) => sum + b.count, 0)).toBe(200_000);
     }, 20_000);
+});
+
+describe('rollupCategories', () => {
+    it('sums repeated categories into one row each', () => {
+        const rows = [
+            { region: 'North', sales: 10 },
+            { region: 'North', sales: 15 },
+            { region: 'South', sales: 20 },
+        ];
+        expect(rollupCategories(rows, 'region', 'sales')).toEqual([
+            { region: 'North', sales: 25 },
+            { region: 'South', sales: 20 },
+        ]);
+    });
+
+    it('is a no-op on data that is already one row per category', () => {
+        const rows = [{ region: 'North', sales: 25 }, { region: 'South', sales: 20 }];
+        expect(rollupCategories(rows, 'region', 'sales')).toEqual(rows);
+    });
+
+    it('falls back to first-appearance order when no canonical order is supplied', () => {
+        const rows = [{ size: 'L', n: 3 }, { size: 'S', n: 1 }];
+        expect(rollupCategories(rows, 'size', 'n').map((r) => r.size)).toEqual(['L', 'S']);
+    });
+
+    it('orders rows by the supplied canonical order, appending unknowns after in first-appearance order', () => {
+        const rows = [
+            { size: 'L', n: 3 }, { size: 'XL', n: 4 }, { size: 'S', n: 1 }, { size: 'M', n: 2 },
+        ];
+        const result = rollupCategories(rows, 'size', 'n', ['S', 'M', 'L']);
+        expect(result.map((r) => r.size)).toEqual(['S', 'M', 'L', 'XL']);
+    });
+
+    it('treats a non-numeric or null value as 0 rather than NaN, so a bad row cannot poison a slice total', () => {
+        const rows = [
+            { region: 'North', sales: 'oops' },
+            { region: 'North', sales: 5 },
+            { region: 'South', sales: null },
+        ];
+        expect(rollupCategories(rows, 'region', 'sales')).toEqual([
+            { region: 'North', sales: 5 },
+            { region: 'South', sales: 0 },
+        ]);
+    });
+
+    it('skips rows whose category value is null or undefined', () => {
+        const rows = [{ region: null, sales: 5 }, { region: 'North', sales: 10 }];
+        expect(rollupCategories(rows, 'region', 'sales')).toEqual([{ region: 'North', sales: 10 }]);
+    });
 });
