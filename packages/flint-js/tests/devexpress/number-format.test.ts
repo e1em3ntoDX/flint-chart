@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 
 import { describe, it, expect } from 'vitest';
-import { formatValue } from '../../src/devexpress/number-format';
+import { formatValue, patternToDevExtremeFormat } from '../../src/devexpress/number-format';
 
 describe('formatValue', () => {
     it('formats a plain number with no spec using a generic grouped format', () => {
@@ -43,5 +43,26 @@ describe('formatValue', () => {
 
     it('renders a negative value with a leading minus, not a trailing one', () => {
         expect(formatValue(-42.5, { pattern: ',.1f' })).toBe('-42.5');
+    });
+});
+
+describe('patternToDevExtremeFormat', () => {
+    it('translates the grouped fixed-decimal form', () => {
+        expect(patternToDevExtremeFormat(',.2f'))
+            .toEqual({ type: 'fixedPoint', precision: 2, useThousandsSeparator: true });
+    });
+    it('translates the integer form', () => {
+        expect(patternToDevExtremeFormat(',d'))
+            .toEqual({ type: 'fixedPoint', precision: 0, useThousandsSeparator: true });
+    });
+    it('translates the percent forms', () => {
+        expect(patternToDevExtremeFormat('.1%'))
+            .toEqual({ type: 'percent', precision: 1, useThousandsSeparator: false });
+        // `~` (trim trailing zero) has no object-form equivalent; precision wins.
+        expect(patternToDevExtremeFormat('.1~%'))
+            .toEqual({ type: 'percent', precision: 1, useThousandsSeparator: false });
+    });
+    it('returns undefined for anything outside the grammar core emits', () => {
+        expect(patternToDevExtremeFormat('$,.2s')).toBeUndefined();
     });
 });

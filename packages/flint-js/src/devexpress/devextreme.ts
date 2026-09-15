@@ -11,7 +11,7 @@
  */
 
 import type { AxisPlan, DevExpressChartPlan, FontSpec, SeriesPlan, TitlePlan, TypographyPlan } from './plan';
-import { formatValue } from './number-format';
+import { formatValue, patternToDevExtremeFormat } from './number-format';
 
 const VIEW_TYPE_TO_DX: Record<string, string> = {
     Bar: 'bar',
@@ -121,7 +121,32 @@ function axisOptions(
         inverted: axis.reverse,
     };
     const label: Record<string, unknown> = {};
-    if (axis.labelFormat) label.format = axis.labelFormat;
+    // axis.labelFormat carries a d3-format pattern (see plan.ts's own doc
+    // comment), which DevExtreme's label.format cannot read directly — it
+    // wants a format name, a { type, precision } object, or an LDML pattern.
+    // patternToDevExtremeFormat translates the subset core actually emits;
+    // anything outside that grammar leaves `format` unset so dxChart falls
+    // back to its own default instead of rendering d3 syntax as text.
+    const fmt = axis.labelFormat ? patternToDevExtremeFormat(axis.labelFormat) : undefined;
+    if (fmt) label.format = fmt;
+    if (axis.labelPrefix || axis.labelSuffix) {
+        // Ticks must read the same as the point labels, which already carry
+        // the prefix/suffix through SeriesPlan.valueFormat (see
+        // cartesianSeries above). DevExtreme has no prefix/suffix option on an
+        // axis label, so wrap valueText instead.
+        //
+        // This is a function, so it cannot survive JSON.stringify — consistent
+        // with Task 8 dropping the projection from the MCP tool response, and
+        // with the standing rule that planToDevExtreme() runs client-side, not
+        // on the server that produces the plan.
+        const prefix = axis.labelPrefix ?? '';
+        const suffix = axis.labelSuffix ?? '';
+        // Read from the callback argument (DevExtreme also binds `this` to the
+        // same object, but every other customizeText in this file — see
+        // cartesianSeries above — reads the argument, so this stays consistent
+        // and works regardless of how the caller invokes it).
+        label.customizeText = (info: { valueText: string }) => `${prefix}${info.valueText}${suffix}`;
+    }
     if (labelFont) label.font = labelFont;
     if (Object.keys(label).length > 0) options.label = label;
     if (axis.logarithmic) options.type = 'logarithmic';

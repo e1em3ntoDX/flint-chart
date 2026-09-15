@@ -54,6 +54,10 @@ export interface AxisPlan {
     title?: string;
     /** Format string for tick labels. */
     labelFormat?: string;
+    /** Currency/unit prefix core computed for this field, for tick labels. */
+    labelPrefix?: string;
+    /** Currency/unit suffix core computed for this field, for tick labels. */
+    labelSuffix?: string;
     /** From Flint's zero decision. Ignored on qualitative axes. */
     includeZero: boolean;
     logarithmic: boolean;

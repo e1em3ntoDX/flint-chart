@@ -119,6 +119,12 @@ describe('schema and prepareDevExpressPlan agree', () => {
             p.diagram.argumentAxisChannel = 'y';
             return p;
         }],
+        ['an axis with a currency prefix', () => {
+            const p = validPlan();
+            (p.diagram.axisY as Record<string, unknown>).labelPrefix = '$';
+            (p.diagram.axisY as Record<string, unknown>).labelSuffix = '/mo';
+            return p;
+        }],
     ];
 
     const rejected: Array<[string, () => unknown]> = [
@@ -150,6 +156,11 @@ describe('schema and prepareDevExpressPlan agree', () => {
         ['an invalid argumentAxisChannel', () => {
             const p = validPlan();
             (p.diagram as Record<string, unknown>).argumentAxisChannel = 'z';
+            return p;
+        }],
+        ['an axis labelPrefix that is not a string', () => {
+            const p = validPlan();
+            (p.diagram.axisY as Record<string, unknown>).labelPrefix = 42;
             return p;
         }],
         ['an invalid argument scale type', () => {

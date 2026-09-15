@@ -343,4 +343,78 @@ describe('planToDevExtreme', () => {
         const series = options.series as Array<Record<string, unknown>>;
         expect((series[0].label as Record<string, unknown>).font).toBeUndefined();
     });
+
+    // Regression for §4.8: label.format used to receive axis.labelFormat verbatim
+    // (a raw d3 pattern like ',.2f'), which DevExtreme cannot read, so ticks
+    // rendered wrong; and the currency prefix core computed for this same field
+    // reached point labels via valueFormat but never the axis, so ticks and
+    // point labels disagreed on one chart.
+    it('gives the axis an LDML format and keeps the currency prefix', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.diagram!.axisY.labelFormat = ',.2f';
+        plan.diagram!.axisY.labelPrefix = '$';
+        const { options } = planToDevExtreme(plan);
+
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        const label = valueAxis.label as {
+            format: unknown;
+            customizeText: (info: { value: number; valueText: string }) => string;
+        };
+        expect(label.format).toEqual({ type: 'fixedPoint', precision: 2, useThousandsSeparator: true });
+        // The prefix core computed must reach the ticks, not only the point labels.
+        expect(typeof label.customizeText).toBe('function');
+        expect(label.customizeText({ value: 1234.5, valueText: '1,234.50' })).toBe('$1,234.50');
+    });
+
+    // A pattern outside the grammar core actually emits (or a hand-authored
+    // spec that strays from it) must not reach dxChart as a raw string it
+    // cannot read — leaving `format` unset lets DevExtreme fall back to its
+    // own default instead of rendering syntax as text.
+    it('leaves label.format unset for a pattern outside the supported grammar', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        plan.diagram!.axisY.labelFormat = '$,.2s';
+        const { options } = planToDevExtreme(plan);
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        const label = valueAxis.label as Record<string, unknown> | undefined;
+        expect(label?.format).toBeUndefined();
+    });
+
+    // An axis with no prefix/suffix must not grow a customizeText it doesn't
+    // need — only the currency/unit case threads one through.
+    it('adds no customizeText when the axis carries no prefix or suffix', () => {
+        const plan = assembleDevExpressPlan(barInput);
+        const { options } = planToDevExtreme(plan);
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        const label = valueAxis.label as Record<string, unknown> | undefined;
+        expect(label?.customizeText).toBeUndefined();
+    });
+
+    // End-to-end: a real Price/USD field through the normal assembly pipeline.
+    // Core resolves both the axis format (field-semantics.ts:356) and the
+    // point/tooltip valueFormat from the same annotation, so the two must read
+    // the same value the same way once projected.
+    it('renders axis ticks and point labels identically for a real currency chart', () => {
+        const plan = assembleDevExpressPlan({
+            data: { values: [{ quarter: 'Q1', revenue: 1234.5 }, { quarter: 'Q2', revenue: 987.65 }] },
+            semantic_types: { quarter: 'Quarter', revenue: { semanticType: 'Price', unit: 'USD' } },
+            chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'quarter' }, y: { field: 'revenue' } } },
+        } as never);
+
+        expect(plan.diagram!.axisY.labelFormat).toBe(',.2f');
+        expect(plan.diagram!.axisY.labelPrefix).toBe('$');
+        expect(plan.series[0].valueFormat).toEqual({ pattern: ',.2f', prefix: '$' });
+
+        const { options } = planToDevExtreme(plan);
+        const valueAxis = options.valueAxis as Record<string, unknown>;
+        const axisLabel = valueAxis.label as { customizeText: (info: { value: number; valueText: string }) => string };
+        const tickReading = axisLabel.customizeText({ value: 1234.5, valueText: '1,234.50' });
+
+        const series = options.series as Array<Record<string, unknown>>;
+        const pointLabel = series[0].label as { customizeText: (info: { value: number }) => string };
+        const pointReading = pointLabel.customizeText({ value: 1234.5 });
+
+        expect(tickReading).toBe('$1,234.50');
+        expect(pointReading).toBe('$1,234.50');
+        expect(tickReading).toBe(pointReading);
+    });
 });

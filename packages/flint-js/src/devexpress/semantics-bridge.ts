@@ -18,11 +18,12 @@
  *   as an object (`zero?.zero`, core/compute-layout.ts:588/592/1753/1757) — so
  *   the object branch below is the one that fires, on its `'zero'` key. The
  *   `boolean` branch and the other candidate keys are defensive fallbacks.
- * - `format`: real captures never populate `.format` (only `.tooltipFormat`,
- *   out of scope here), but when a backend sets `.format` its shape is the
- *   real `FormatSpec = { pattern?; prefix?; suffix?; abbreviate? }`
- *   (field-semantics.ts:69). `pattern` was already first in the candidate
- *   list; confirmed correct, left unchanged.
+ * - `format`: core DOES populate it, in two real cases — currency with a known
+ *   symbol (core/field-semantics.ts:356, `{ pattern: ',.2f', prefix: '$' }`) and
+ *   a 0–1 percent with an intrinsicDomain (`:376`, `{ pattern: '.N~%' }`). An
+ *   earlier version of this note claimed the opposite; the reader was always
+ *   live. Its shape is the real `FormatSpec = { pattern?; prefix?; suffix?;
+ *   abbreviate? }` (field-semantics.ts:89), and `pattern` is checked first.
  * - `colorScheme`: real shape is `ColorSchemeRecommendation =
  *   { scheme: string; type: ColorSchemeType; reason: string; domainMid?: number }`
  *   (semantic-types.ts:591), where `type` carries the class
@@ -69,7 +70,7 @@ export function resolveLabelFormat(sem: Loose | undefined): string | undefined {
     if (typeof format === 'string') return format;
     const record = asRecord(format);
     if (record) {
-        // 'pattern' is the real FormatSpec key (field-semantics.ts:69) and is
+        // 'pattern' is the real FormatSpec key (field-semantics.ts:89) and is
         // already checked first; the rest remain as defensive fallbacks.
         for (const key of ['pattern', 'format', 'specifier', 'formatString']) {
             if (typeof record[key] === 'string') return record[key] as string;

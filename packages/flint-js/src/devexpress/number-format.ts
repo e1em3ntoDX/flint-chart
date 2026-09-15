@@ -53,6 +53,54 @@ function genericFormat(value: number): string {
     return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
+/** DevExtreme's numeric-format object; see `label.format` in the dxChart docs. */
+export interface DevExtremeNumberFormat {
+    type: 'fixedPoint' | 'percent';
+    precision: number;
+    useThousandsSeparator?: boolean;
+}
+
+/**
+ * The DevExtreme `label.format` equivalent of a d3 pattern, or undefined when
+ * the pattern falls outside the subset core emits.
+ *
+ * DevExtreme's `label.format` accepts a format name, a `{ type, precision }`
+ * object, or an LDML pattern — never d3 syntax, so passing a pattern like
+ * ',.2f' straight through renders the ticks wrong. This returns the object
+ * form rather than an LDML string: it needs no locale-pattern escaping, and
+ * `useThousandsSeparator` carries the grouping flag that a `,` encodes in d3.
+ * One representation only, so callers and tests cannot disagree on shape.
+ * Anything unrecognised returns undefined and the caller leaves `format`
+ * unset rather than handing dxChart a string it cannot read.
+ *
+ * The grammar parsed here is the same one applyPattern above interprets: an
+ * optional leading '+', an optional grouping ',', then 'd' or '.Nf', or a
+ * percent form '.N%' / '.N~%'.
+ *
+ * Known limitation: the `~` in `.1~%` means "trim a trailing zero" (0.40 ->
+ * "40%" instead of "40.0%"), which the `{ type, precision }` object form
+ * cannot express — `precision` always shows that many decimals, so a
+ * `.1~%` axis reads "12.0%". applyPattern above still honours `~` for point
+ * labels and tooltips, so on such an axis the ticks and the point labels can
+ * differ by a trailing ".0". That is narrower than the bug this function
+ * fixes (ticks rendering raw d3 syntax outright), but it is real.
+ */
+export function patternToDevExtremeFormat(pattern: string): DevExtremeNumberFormat | undefined {
+    const useThousandsSeparator = pattern.includes(',');
+    const percentMatch = pattern.match(/\.(\d+)~?%/);
+    if (pattern.endsWith('%') && percentMatch) {
+        return { type: 'percent', precision: Number(percentMatch[1]), useThousandsSeparator };
+    }
+    const fixedMatch = pattern.match(/\.(\d+)f/);
+    if (fixedMatch) {
+        return { type: 'fixedPoint', precision: Number(fixedMatch[1]), useThousandsSeparator };
+    }
+    if (/(^|[^a-z])d$/.test(pattern)) {
+        return { type: 'fixedPoint', precision: 0, useThousandsSeparator };
+    }
+    return undefined;
+}
+
 export function formatValue(raw: unknown, spec?: ValueFormatSpec): string {
     if (typeof raw !== 'number' || !Number.isFinite(raw)) {
         return raw == null ? '' : String(raw);

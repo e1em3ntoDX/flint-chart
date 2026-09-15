@@ -116,6 +116,8 @@ function validateAxis(value: unknown, what: string): void {
     requireBoolean(axis.reverse, `${what}.reverse`);
     requireOptionalString(axis.title, `${what}.title`);
     requireOptionalString(axis.labelFormat, `${what}.labelFormat`);
+    requireOptionalString(axis.labelPrefix, `${what}.labelPrefix`);
+    requireOptionalString(axis.labelSuffix, `${what}.labelSuffix`);
 }
 
 function validateFontSpec(value: unknown, what: string): void {

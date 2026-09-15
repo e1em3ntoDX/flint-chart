@@ -225,6 +225,14 @@
           "type": "string",
           "description": "Format string for tick labels."
         },
+        "labelPrefix": {
+          "type": "string",
+          "description": "Currency/unit prefix core computed for this field, for tick labels."
+        },
+        "labelSuffix": {
+          "type": "string",
+          "description": "Currency/unit suffix core computed for this field, for tick labels."
+        },
         "includeZero": {
           "type": "boolean",
           "description": "From Flint's zero decision. Ignored on qualitative axes."

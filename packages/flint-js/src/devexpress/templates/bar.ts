@@ -64,9 +64,17 @@ export function resolveAxisRoles(
 
 function axis(context: InstantiateContext, channel: string, applyZero: boolean): AxisPlan {
     const sem = context.channelSemantics[channel];
+    // resolveLabelFormat only ever returns the bare `pattern` (see its own
+    // reconciliation note in semantics-bridge.ts): the `$` prefix core computes
+    // alongside it (core/field-semantics.ts:356) lives on the same FormatSpec
+    // and must reach the axis too, or ticks and point labels disagree on the
+    // same chart. resolveTooltipFormat already reads that full FormatSpec.
+    const tooltipFormat = resolveTooltipFormat(sem);
     return {
         title: humanizeFieldName(fieldOf(context, channel)),
         labelFormat: resolveLabelFormat(sem),
+        labelPrefix: tooltipFormat?.prefix,
+        labelSuffix: tooltipFormat?.suffix,
         includeZero: applyZero ? resolveIncludeZero(sem) : false,
         logarithmic: resolveLogarithmic(sem),
         gridLines: applyZero,
