@@ -9,6 +9,7 @@ import {
   assemblePlotly,
   assembleExcel,
 } from '../src';
+import { assembleDevExpressPlan } from '../src/devexpress';
 
 const DATA = [
   { weight: 1.6, mpg: 32, origin: 'JP' },
@@ -1114,5 +1115,15 @@ describe('public API smoke', () => {
     expect(rowsFor('average', 'time_average')).toEqual([2, 3]); // A: mean(1,3), B: mean(2,4)
     expect(rowsFor('mean', 'time_mean')).toEqual([2, 3]);       // synonym of average
     expect(rowsFor('count', '_count')).toEqual([2, 2]);         // 2 rows per group
+  });
+
+  it('assembleDevExpressPlan returns a v1 plan', () => {
+    const plan = assembleDevExpressPlan({
+        data: { values: [{ a: 'x', b: 1 }, { a: 'y', b: 2 }] },
+        semantic_types: { a: 'Category', b: 'Quantity' },
+        chart_spec: { chartType: 'Bar Chart', encodings: { x: { field: 'a' }, y: { field: 'b' } } },
+    });
+    expect(plan.schema).toBe('flint.devexpress.chart/v1');
+    expect(plan.series.length).toBeGreaterThan(0);
   });
 });

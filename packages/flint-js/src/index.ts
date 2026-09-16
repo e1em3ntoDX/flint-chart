@@ -57,3 +57,6 @@ export * from './plotly';
 
 // Excel backend: assembleExcel + Excel chart spec types
 export * from './excel';
+
+// DevExpress backend: assembleDevExpressPlan, planToDevExtreme + plan types
+export * from './devexpress';

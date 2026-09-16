@@ -1,0 +1,73 @@
+// flint-chart/packages/flint-js/src/devexpress/templates/line.ts
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+import type { InstantiateContext } from '../../core/types';
+import type { DevExpressChartPlan } from '../plan';
+import { applyCartesianFrame, applySplitSeries, baseSeries, noteUnsupported, resolveSplitChannel } from './bar';
+import { registerTemplate, type DxTemplateDef } from './index';
+
+type Draft = Partial<DevExpressChartPlan>;
+
+function lineViewType(context: InstantiateContext): string {
+    switch (context.chartProperties?.interpolate) {
+        case 'spline': return 'Spline';
+        case 'step': return 'StepLine';
+        default: return 'Line';
+    }
+}
+
+const lineChart: DxTemplateDef = {
+    chart: 'Line Chart',
+    // `template.mark: 'line'` is read by markTypeOf (devexpress/assemble.ts:53)
+    // before it falls back to the markCognitiveChannel ('position') mapping.
+    // Without it, computeZeroDecision would treat a Line Chart as a scatter/point
+    // mark, wrongly defaulting includeZero to false on zero-meaningful data
+    // (e.g. a revenue line chart) — diverging from Flint's own core line branch
+    // (core/semantic-types.ts:488, the position-mark case) and its vegalite
+    // Line Chart template (vegalite/templates/line.ts:118, `mark: "line"`), both
+    // of which get includeZero: true for the same case.
+    template: { mark: 'line' },
+    channels: ['x', 'y', 'color', 'strokeDash', 'detail', 'opacity'],
+    requiredChannels: ['x', 'y'],
+    family: 'Cartesian',
+    targets: ['devextreme', 'xtracharts'],
+    markCognitiveChannel: 'position',
+    instantiate(spec: Draft, context: InstantiateContext) {
+        // Line Chart itself never requests rotation (unlike Bar Chart's
+        // isHorizontal(), there is no horizontal-orient option here) — but
+        // applyCartesianFrame still ORs in `categoryAxis === 'y'`, so the
+        // projected plan DOES come out rotated:true whenever a discrete y
+        // lands the category on that axis.
+        const hasColor = resolveSplitChannel(spec, context, 'color');
+        applyCartesianFrame(spec, context, { rotated: false, legend: hasColor });
+        const viewType = lineViewType(context);
+        if (hasColor) {
+            applySplitSeries(spec, context, 'color', viewType, true);
+        } else {
+            spec.series = [{ ...baseSeries(context, viewType), labelsVisible: true }];
+        }
+        if (context.encodings.opacity != null) {
+            noteUnsupported(spec, {
+                feature: 'opacity',
+                action: 'rejected',
+                detail: 'dxChart has no data-driven per-point opacity channel; '
+                    + 'the encoding was ignored.',
+            });
+        }
+        if (context.encodings.detail != null) {
+            noteUnsupported(spec, {
+                feature: 'detail',
+                action: 'rejected',
+                detail: 'dxChart has no unlabeled series-per-value split; bind color instead if '
+                    + 'the values should render as distinct series.',
+            });
+        }
+        // `strokeDash` is deliberately left un-reported here: dxChart series
+        // expose a real `dashStyle` option, so this encoding may be genuinely
+        // implementable rather than unsupported. Stamping it "rejected" would
+        // be a guess pending that investigation.
+    },
+};
+
+registerTemplate(lineChart);
